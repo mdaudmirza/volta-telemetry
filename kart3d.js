@@ -177,9 +177,10 @@ if (abs(kn.x) > 0.55 && kp.x > 0.5 && kp.y > 0.14 && kp.y < 0.78 && kp.z > -0.33
 if (kn.z > 0.6 && kp.x < 0.5 && vKPos.y > 0.86 && vKPos.y < 1.2 && vKPos.z > 0.2) {
   vec2 uv = vec2((vKPos.x + 0.5) / 1.0, (vKPos.y - 0.86) / 0.34);
   vec4 d = texture2D(uWing, uv); diffuseColor.rgb = mix(diffuseColor.rgb, d.rgb, d.a * 0.95); }
-// nose logo: top of the nose cone, reading towards the nose tip (as on the real kart)
-if (kn.z > 0.5 && abs(vKPos.x) < 0.12 && vKPos.y > -1.13 && vKPos.y < -0.81 && vKPos.z > -0.05) {
-  vec2 uv = vec2((-0.82 - vKPos.y) / 0.30, (0.11 - vKPos.x) / 0.22);
+// nose logo: top of the nose cone, upright and readable for someone standing in front of the kart
+// (their right is +x, "up" on the nose runs away from them towards +y)
+if (kn.z > 0.5 && abs(vKPos.x) < 0.12 && vKPos.y > -1.06 && vKPos.y < -0.885 && vKPos.z > -0.05) {
+  vec2 uv = vec2((vKPos.x + 0.12) / 0.24, (vKPos.y + 1.06) / 0.175);
   if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) { vec4 d = texture2D(uNose, uv); diffuseColor.rgb = mix(diffuseColor.rgb, d.rgb, d.a); } }
 // mudguard logos: upper faces above each wheel, text running along the mudguard (front to back)
 if (kn.z > 0.45 && kp.x > 0.53 && kp.x < 0.79 && vKPos.z > -0.15) {
