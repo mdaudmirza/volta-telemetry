@@ -47,7 +47,7 @@ svg.ico { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColo
 .topbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; border-width: 0 0 1px;
   padding: calc(8px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
 .brand { display: flex; align-items: center; min-height: 32px; }
-.brand img { height: 26px; width: auto; }
+.brand img { height: 30px; width: auto; }
 .wordmark { font-weight: 700; font-size: 16px; letter-spacing: .12em; }
 .status { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px 0 14px; border-radius: 999px;
   border: 0; background: var(--fill); font-size: 13px; font-weight: 500; white-space: nowrap; max-width: 64vw; }
@@ -266,51 +266,75 @@ body.sheet-open .sheet { transform: none; }
 .toast { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   padding: 12px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 10px 30px var(--shadow); }
 
-/* ---------- wide and short: phone sideways, tablet ---------- */
+/* ---------- wide: phone sideways, tablet, desktop ----------
+   The car stage takes the middle ~60%; the side cards are narrow. Type and gauges scale with the screen height (vh), so the same layout is
+   compact on a phone held sideways (~360-420 px tall) and roomy on a desktop. The speed readout sits in the stage corner, not above the car. */
 @media (min-width: 700px) and (min-aspect-ratio: 13/10) {
   .app { height: 100dvh; padding: 0; display: grid; grid-template-columns: auto minmax(0,1fr); grid-template-rows: auto minmax(0,1fr);
     grid-template-areas: "tabs top" "tabs main"; }
   .topbar { grid-area: top; position: static; flex-wrap: nowrap; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
-    padding: max(8px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 2px 2px; }
-  .alert { order: 0; flex: 1 1 auto; min-height: 32px; }
+    padding: max(6px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 0 4px; min-height: 0; }
+  .brand img { height: clamp(26px, 7.5vh, 40px); }
+  .alert { order: 0; flex: 1 1 auto; min-height: 30px; font-size: 13px; }
   .alert[data-sev="ok"] { display: flex; background: transparent; }
   .status { max-width: 40vw; min-height: 32px; }
   .tabs { grid-area: tabs; position: static; transform: none; align-self: center; flex-direction: column; margin: 0 0 0 max(8px, env(safe-area-inset-left, 0px)); border-radius: 28px; }
-  .tabs button { min-width: 64px; min-height: 58px; padding: 4px; border-radius: 22px; }
+  .tabs button { min-width: 60px; min-height: clamp(48px, 13vh, 60px); padding: 4px; border-radius: 22px; }
+  .tabs button .ico { width: 22px; height: 22px; }
   main { grid-area: main; overflow: auto; padding: 6px max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) 10px; }
-  .drive { height: 100%; gap: 10px; grid-template-columns: minmax(180px,1fr) minmax(0,1.55fr) minmax(190px,1fr);
-    grid-template-rows: minmax(0,1fr) minmax(0,1fr) auto; grid-template-areas: "power stage batt" "pack stage temps" "lap stage mode"; }
-  .drive .card:not(.stage) { padding: 10px 12px; border-radius: 18px; }
-  .drive .val { font-size: 26px; }
-  .drive .lbl { font-size: 12px; }
-  .stage { padding: 8px; min-height: 0; }
-  .kartwrap { margin: -8px; width: calc(100% + 16px); height: calc(100% + 16px); }
-  .speedo { width: min(100%, 190px); }
-  .spd .big { font-size: 54px; }
-  .parts button { min-height: 30px; padding: 0 10px; font-size: 12px; }
-  .stagefoot { gap: 4px; }
-  .minimap { width: 64px; height: 64px; top: 8px; right: 8px; }
-  .batt .row { margin-top: 2px; }
-  .batt .ring { width: 54px; height: 54px; }
-  .temps .row { margin-top: 2px; }
-  .temps .ring { width: 46px; height: 46px; }
-  .temps .ring .in { font-size: 13px; }
-  .temps .ring { width: 42px; height: 42px; }
+
+  .drive { height: 100%; max-width: 1600px; max-height: 920px; margin: 0 auto; align-content: center; gap: clamp(8px, 1.6vh, 14px);
+    grid-template-columns: minmax(148px, .75fr) minmax(0, 2.5fr) minmax(158px, .8fr);
+    grid-template-rows: repeat(3, minmax(0, 1fr)); grid-template-areas: "power stage batt" "pack stage temps" "lap stage mode"; }
+  .drive .card:not(.stage) { padding: clamp(8px, 2vh, 16px) clamp(10px, 1.2vw, 18px); border-radius: 18px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .drive .lbl { font-size: clamp(11px, 2.6vh, 14px); min-height: 0; }
+  .drive .val { font-size: clamp(18px, 5.2vh, 40px); }
+  .drive .val small { font-size: clamp(11px, 2.8vh, 17px); }
+  .drive .sub { font-size: clamp(11px, 2.6vh, 14px); }
+  .drive .bar { margin: clamp(3px, 1vh, 8px) 0; height: 5px; }
+  .lap .iconbtn { position: absolute; top: 8px; right: 8px; margin: 0; width: 36px; height: 36px; }
+  .lap .iconbtn::after { content: ""; position: absolute; inset: -4px; }            /* 44 px tap area */
+  .batt .row { margin-top: 2px; gap: clamp(8px, 1vw, 14px); }
+  .batt .ring { width: clamp(38px, 12vh, 84px); height: clamp(38px, 12vh, 84px); }
+  .batt .ring .in { font-size: clamp(11px, 3vh, 20px); }
+  .batt .val { font-size: clamp(16px, 4.4vh, 34px) !important; }
+  .temps .row { margin-top: 2px; gap: 4px; }
+  .temps .ring { width: clamp(32px, 10vh, 70px); height: clamp(32px, 10vh, 70px); }
+  .temps .ring .in { font-size: clamp(10px, 2.7vh, 17px); }
   .temps .name { font-size: 11px; margin-top: 0; }
   .temps .state:empty { display: none; }
-  .modes { gap: 6px; }
+  .modes { gap: clamp(4px, 1.2vh, 10px); }
   .modes .r { grid-template-columns: 1fr; gap: 4px; }
   .modes .r .lbl { display: none; }
-  .seg button { min-height: 32px; font-size: 13px; }
+  .seg button { min-height: clamp(28px, 8vh, 40px); font-size: clamp(12px, 3vh, 15px); }
+
+  /* stage: car fills it; speed in the top-left corner, map top-right, part buttons along the bottom */
+  .stage { display: block; position: relative; padding: 0; min-height: 0; }
+  .kartwrap { position: absolute; inset: 0; margin: 0; width: auto; height: auto; }
+  .stage > .speedo { position: absolute; z-index: 1; left: clamp(8px, 1.4vw, 18px); top: clamp(6px, 1.6vh, 14px); width: clamp(120px, 30vh, 250px); }
+  .spd .big { font-size: clamp(30px, 10vh, 72px); }
+  .spd .u { font-size: clamp(10px, 2.4vh, 13px); }
+  .speedo text { font-size: 10px; }
+  .minimap { width: clamp(52px, 14vh, 96px); height: clamp(52px, 14vh, 96px); top: clamp(6px, 1.6vh, 14px); right: clamp(8px, 1.4vw, 18px); }
+  .stage > .stagefoot { position: absolute; z-index: 1; left: 8px; right: 8px; bottom: clamp(6px, 1.4vh, 12px); gap: 4px; }
+  .parts > :first-child { margin-left: auto; } .parts > :last-child { margin-right: auto; }   /* centred, but still scrolls from the first chip */
+  .parts button { min-height: clamp(28px, 7.5vh, 36px); padding: 0 10px; font-size: clamp(11px, 2.8vh, 13px); }
+  .klabel { font-size: 11px; min-height: 28px; }
   .toast { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
   .sheet { bottom: auto; top: 50%; border-radius: 22px; border-bottom: 1px solid var(--glass-line); transform: translateY(-40%) scale(.96); opacity: 0;
     transition: transform .25s, opacity .25s; padding-bottom: 18px; max-height: 92dvh; overflow: auto; }
   body.sheet-open .sheet { transform: translateY(-50%); opacity: 1; }
   .grabber { display: none; }
 }
-@media (min-width: 700px) and (min-aspect-ratio: 13/10) and (max-height: 430px) {
-  .drive .sub { font-size: 12px; }
-  .pack .bar, .power .bar { margin: 5px 0 3px; }
+/* short screens (phone sideways): drop the extras so the car and readouts get the room */
+@media (min-width: 700px) and (min-aspect-ratio: 13/10) and (max-height: 520px) {
+  .khint, .thr, #ctlState { display: none !important; }
+  .drive .card:not(.stage) .bar + .sub { margin-top: 0; }
+  .alert[data-sev="ok"] .tag, .alert[data-sev="ok"] #alertText { font-size: 12px; }
+}
+/* big screens: a touch more air between the cockpit and the window edges */
+@media (min-width: 1100px) and (min-height: 700px) {
+  main { padding: 10px 24px 20px 16px; }
 }
 
 /* accessibility states */
@@ -996,7 +1020,7 @@ let lapStart = 0, best = Infinity, lastLapMs = 0;
 const mmss = ms => { const s = ms / 1000; return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`; };
 function lapUi() {
   $("lapLbl").textContent = lapStart ? `Lap ${lapNo}` : "Lap timer";
-  $("lapSub").textContent = !lapStart ? "Tap the flag at the start line" : lapNo > 1 ? `Last ${mmss(lastLapMs)} · Best ${mmss(best)}` : "Timing first lap";
+  $("lapSub").textContent = !lapStart ? "Tap the flag at the start" : lapNo > 1 ? `Last ${mmss(lastLapMs)} · Best ${mmss(best)}` : "Timing first lap";
 }
 function markLap() {
   const now = Date.now();

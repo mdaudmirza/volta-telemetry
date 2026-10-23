@@ -155,7 +155,7 @@ function start() {
     uZMax: { value: boxes.map(b => b[2]).concat(Array(MAXB - boxes.length).fill(far)) },
     uZCol: { value: Array.from({ length: MAXB }, () => new THREE.Color(0, 0, 0)) },
     uZStr: { value: new Array(MAXB).fill(0) },
-    uSide: { value: sideTex() }, uWing: { value: wingTex() }, uFender: { value: fenderTex() },
+    uSide: { value: sideTex() }, uWing: { value: wingTex() }, uFender: { value: fenderTex() }, uNose: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) },
   };
   for (const [name, mat] of Object.entries(M)) mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
@@ -164,7 +164,7 @@ function start() {
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
 varying vec3 vKPos; varying vec3 vKNor;
 uniform vec3 uZMin[${MAXB}]; uniform vec3 uZMax[${MAXB}]; uniform vec3 uZCol[${MAXB}]; uniform float uZStr[${MAXB}];
-uniform sampler2D uSide; uniform sampler2D uWing; uniform sampler2D uFender;
+uniform sampler2D uSide; uniform sampler2D uWing; uniform sampler2D uFender; uniform sampler2D uNose;
 float kIn(vec3 p, vec3 a, vec3 b) { vec3 d = max(a - p, p - b); return 1.0 - smoothstep(0.0, 0.035, max(max(d.x, d.y), d.z)); }`)
       .replace("#include <color_fragment>", `#include <color_fragment>
 vec3 kp = vec3(abs(vKPos.x), vKPos.yz); vec3 kn = normalize(vKNor);
@@ -177,6 +177,10 @@ if (abs(kn.x) > 0.55 && kp.x > 0.5 && kp.y > 0.14 && kp.y < 0.78 && kp.z > -0.33
 if (kn.z > 0.6 && kp.x < 0.5 && vKPos.y > 0.86 && vKPos.y < 1.2 && vKPos.z > 0.2) {
   vec2 uv = vec2((vKPos.x + 0.5) / 1.0, (vKPos.y - 0.86) / 0.34);
   vec4 d = texture2D(uWing, uv); diffuseColor.rgb = mix(diffuseColor.rgb, d.rgb, d.a * 0.95); }
+// nose logo: top of the nose cone, reading towards the nose tip (as on the real kart)
+if (kn.z > 0.5 && abs(vKPos.x) < 0.12 && vKPos.y > -1.13 && vKPos.y < -0.81 && vKPos.z > -0.05) {
+  vec2 uv = vec2((-0.82 - vKPos.y) / 0.30, (0.11 - vKPos.x) / 0.22);
+  if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) { vec4 d = texture2D(uNose, uv); diffuseColor.rgb = mix(diffuseColor.rgb, d.rgb, d.a); } }
 // mudguard logos: upper faces above each wheel, text running along the mudguard (front to back)
 if (kn.z > 0.45 && kp.x > 0.53 && kp.x < 0.79 && vKPos.z > -0.15) {
   float wy = vKPos.y < 0.1 ? -0.866 : 1.085;
@@ -187,6 +191,7 @@ if (kn.z > 0.45 && kp.x > 0.53 && kp.x < 0.79 && vKPos.z > -0.15) {
 for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] * kIn(kp, uZMin[i], uZMax[i]);`);
   };
 
+  new THREE.TextureLoader().load("parco-logo.png", t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; U.uNose.value = t; need = true; });
   let kart = null, need = true, state = null, selected = null, pulse = false, tween = null;
   let split = 0, splitTo = 0, ghosted = false, flight = null;                              // 0 = assembled, 1 = split into compartments
   const comps = {};                                                         // compartment name -> THREE.Group
@@ -299,7 +304,10 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
     const hr = host.getBoundingClientRect(), sp = document.querySelector(".stage .speedo"), ft = document.querySelector(".stage .stagefoot");
     // split: the speedo hides, so the kart gets the stage below the Done button
-    const top = splitTo ? 52 : sp ? sp.getBoundingClientRect().top + sp.offsetHeight * 0.78 - hr.top : 0, bot = ft ? ft.getBoundingClientRect().top - hr.top : h;
+    // speed readout across the top (phone upright): start below it; tucked in a corner (wide screens): only nudge the kart down a little
+    const spr = sp && sp.getBoundingClientRect(), corner = spr && spr.width < hr.width * 0.6;
+    const top = splitTo ? 52 : !spr ? 0 : corner ? (spr.bottom - hr.top) * 0.4 : spr.top + spr.height * 0.78 - hr.top;
+    const bot = ft ? ft.getBoundingClientRect().top - hr.top : h;
     const bh = Math.max(bot - top, h * 0.45); band = bh / h;
     renderer.setSize(w, h, false); camera.aspect = w / h;
     camera.setViewOffset(w, h, 0, -((top + bh / 2) - h / 2), w, h);
