@@ -1,0 +1,4 @@
+# keep local-only files out of the published app
+*.log
+.DS_Store
+Thumbs.db

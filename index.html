@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="icon-192.png">
+<title>Crosskart Telemetry</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0b0c0e">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="hud.css">
+<style>
+/* Layout: centre-screen cockpit. The kart stage is the one signature element; cards around it stay quiet.
+   Phone upright: stacked cards, floating tab bar at the bottom. Wide and short (phone sideways, tablet): three columns, tab rail on the left.
+   Glass only on the floating layer (tab bar, top bar, sheet); cards are opaque, which is also cheaper on a mid-range phone. */
+:root {
+  --bg: #0b0c0e; --card: #17191c; --card2: #24272b; --fill: rgba(130,134,142,.2); --sep: rgba(90,94,102,.5);
+  --fg: #ffffff; --fg2: #9b9ea4; --fg3: #5d6066;
+  --accent: #ff8a1f; --on-accent: #000000; --ok: #2fbf4a; --warn: #ffd60a; --crit: #ff453a; --cool: #5ac8fa; --lamp: #fff4d6; --tyre: #0b0b0c;
+  --glass: rgba(23,25,28,.74); --glass-line: rgba(255,255,255,.08); --shadow: rgba(0,0,0,.5);
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --r: 20px; --gap: 12px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #f2f2f4; --card: #ffffff; --card2: #e6e7ea; --fill: rgba(120,124,132,.16); --sep: rgba(60,62,67,.18);
+  --fg: #000000; --fg2: #6b6e74; --fg3: #b0b2b7;
+  --accent: #b25400; --on-accent: #ffffff; --ok: #1c7a32; --warn: #8a6a00; --crit: #d70015; --cool: #0a6fa0; --lamp: #e6a700; --tyre: #3a3a3c;
+  --glass: rgba(249,249,251,.8); --glass-line: rgba(0,0,0,.06); --shadow: rgba(0,0,0,.12); color-scheme: light; } }
+:root[data-theme="light"] {
+  --bg: #f2f2f4; --card: #ffffff; --card2: #e6e7ea; --fill: rgba(120,124,132,.16); --sep: rgba(60,62,67,.18);
+  --fg: #000000; --fg2: #6b6e74; --fg3: #b0b2b7;
+  --accent: #b25400; --on-accent: #ffffff; --ok: #1c7a32; --warn: #8a6a00; --crit: #d70015; --cool: #0a6fa0; --lamp: #e6a700; --tyre: #3a3a3c;
+  --glass: rgba(249,249,251,.8); --glass-line: rgba(0,0,0,.06); --shadow: rgba(0,0,0,.12); color-scheme: light; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.35 var(--font); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg.ico { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.glass { background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4); border: 1px solid var(--glass-line); }
+
+/* ---------- shell (upright phone first) ---------- */
+.app { min-height: 100dvh; padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; border-width: 0 0 1px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+.brand { display: flex; align-items: center; min-height: 32px; }
+.brand img { height: 26px; width: auto; }
+.wordmark { font-weight: 700; font-size: 16px; letter-spacing: .12em; }
+.status { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px 0 14px; border-radius: 999px;
+  border: 0; background: var(--fill); font-size: 13px; font-weight: 500; white-space: nowrap; max-width: 64vw; }
+.status span:not(.dot) { overflow: hidden; text-overflow: ellipsis; }
+.status .ico { width: 14px; height: 14px; color: var(--fg2); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg2); flex: none; }
+.status[data-s="live"] .dot { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 30%, transparent); }
+.status[data-s="stale"] .dot { background: var(--warn); }
+.status[data-s="error"] .dot { background: var(--crit); }
+.alert { order: 3; flex: 1 1 100%; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px; border-radius: 12px; font-size: 14px; font-weight: 500; min-width: 0; }
+.alert .tag { font-weight: 700; }
+.alert #alertText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert[data-sev="none"], .alert[data-sev="ok"] { display: none; }
+.alert[data-sev="ok"] { color: var(--ok); }
+.alert[data-sev="warn"] { background: color-mix(in srgb, var(--warn) 18%, var(--card)); color: var(--fg); }
+.alert[data-sev="warn"] .ico, .alert[data-sev="warn"] .tag { color: var(--warn); }
+.alert[data-sev="crit"] { background: var(--crit); color: #fff; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .78; } }
+
+main { padding: 12px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
+.tabs { position: fixed; z-index: 10; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 2px; padding: 4px; border-radius: 999px; box-shadow: 0 10px 30px var(--shadow); }
+.tabs button { display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 74px; min-height: 54px; padding: 4px 10px; border: 0;
+  border-radius: 999px; background: transparent; color: var(--fg2); font-size: 11px; font-weight: 600; }
+.tabs button .ico { width: 24px; height: 24px; }
+.tabs button[aria-current="page"] { color: var(--accent); background: var(--fill); }
+
+/* ---------- cards ---------- */
+.card { background: var(--card); border-radius: var(--r); padding: 14px 16px; min-width: 0; min-height: 0; position: relative; overflow: hidden; }
+.lbl { font-size: 13px; font-weight: 500; color: var(--fg2); display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
+.val { font-size: 30px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
+.val small { font-size: 15px; font-weight: 500; color: var(--fg2); margin-left: 3px; letter-spacing: 0; }
+.sub { font-size: 13px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { position: relative; height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; margin: 8px 0 6px; }
+.bar > i { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 3px; background: var(--accent); transition: width .25s linear, left .25s linear, background-color .4s; }
+.bar > b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--fg3); }
+.iconbtn { display: inline-grid; place-items: center; width: 40px; height: 40px; margin: -8px -8px -8px 0; border: 0; border-radius: 50%; background: var(--fill); color: var(--accent); }
+.iconbtn .ico { width: 18px; height: 18px; }
+
+/* ---------- Drive ---------- */
+.drive { display: grid; gap: var(--gap); grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas: "stage stage" "power batt" "temps temps" "pack lap" "mode mode"; }
+.stage { grid-area: stage; display: grid; grid-template-rows: auto minmax(0,1fr) auto; grid-template-columns: minmax(0,1fr); justify-items: center; gap: 4px; padding: 12px;
+  min-height: 500px; background: radial-gradient(90% 60% at 50% 72%, color-mix(in srgb, var(--accent) 12%, var(--card)) 0%, var(--card) 70%); }
+.kartwrap { grid-row: 1 / -1; grid-column: 1; position: relative; width: 100%; height: 100%; margin: -12px; width: calc(100% + 24px); height: calc(100% + 24px); }
+.kartwrap .kart { position: absolute; inset: 22% 8% 18%; width: auto; height: auto; max-width: 260px; max-height: 360px; margin: auto; }   /* flat fallback stays kart-sized on big screens */
+.kartwrap.has3d .kart { display: none; }
+.stage3d { position: absolute; inset: 0; touch-action: none; }
+.stage3d canvas { width: 100% !important; height: 100% !important; display: block; cursor: grab; }
+.stage > .speedo { grid-row: 1; grid-column: 1; z-index: 1; pointer-events: none; }
+.stage > .stagefoot { grid-row: 3; grid-column: 1; z-index: 1; }
+.speedo { position: relative; width: min(100%, 270px); aspect-ratio: 220 / 128; }
+.speedo svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.arc { fill: none; stroke-width: 8; stroke-linecap: round; }
+.arc.trk { stroke: var(--fill); }
+.arc.red { stroke: color-mix(in srgb, var(--crit) 45%, transparent); stroke-linecap: butt; }
+.arc.v { stroke: var(--accent); stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .22s linear, stroke .3s; }
+.arc.v.hot { stroke: var(--crit); }
+.speedo text { fill: var(--fg2); font: 500 11px var(--font); }
+.spd { position: absolute; left: 0; right: 0; bottom: 4px; display: grid; justify-items: center; }
+.spd .big { font-size: clamp(54px, 15vw, 76px); font-weight: 600; letter-spacing: -.045em; line-height: .95; }
+.spd .u { font-size: 13px; font-weight: 500; color: var(--fg2); }
+.klabels { position: absolute; inset: 0; z-index: 2; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.klabel { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 10px; border: 1px solid var(--glass-line);
+  border-radius: 999px; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--fg); font: 600 13px var(--font);
+  white-space: nowrap; cursor: pointer; box-shadow: 0 4px 14px var(--shadow); font-size: 12px; pointer-events: none; }
+.kartwrap.split .klabel { pointer-events: auto; }
+.klabel::after { content: ""; position: absolute; inset: -7px; }                      /* bigger tap area than the chip */
+.klabel .dot { width: 7px; height: 7px; }
+.klines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.klines path { fill: none; stroke: var(--fg2); stroke-width: 1; opacity: .7; }
+.klines circle { fill: var(--accent); stroke: var(--card); stroke-width: 1.5; }
+.klabel:focus-visible { outline: 2px solid var(--accent); }
+.kdone { position: absolute; z-index: 3; left: 10px; top: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--glass-line);
+  border-radius: 50%; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--fg2); cursor: pointer; }
+.kdone svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.kdone::after { content: ""; position: absolute; inset: -4px; }                     /* 44 px tap area */
+.khold { position: absolute; z-index: 3; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(var(--accent) var(--p, 0%), transparent 0); -webkit-mask: radial-gradient(circle, transparent 22px, #000 23px); mask: radial-gradient(circle, transparent 22px, #000 23px); }
+.khold.go { animation: khold .5s linear forwards; }
+@property --p { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+@keyframes khold { to { --p: 100%; } }
+.stage { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.kartwrap.flying ~ .speedo, .kartwrap.flying ~ .stagefoot, .kartwrap.flying ~ .minimap { opacity: 0; transition: opacity .2s; }
+.speedo { transition: opacity .3s; }
+.kartwrap.split ~ .speedo { opacity: 0; }
+.khint { margin: 0; font-size: 12px; color: var(--fg2); }
+.kartwrap:not(.has3d) ~ .stagefoot .khint, .kartwrap.split ~ .stagefoot .khint { display: none; }
+.minimap { position: absolute; z-index: 1; top: 12px; right: 12px; width: 76px; height: 76px; border-radius: 14px; background: var(--fill); cursor: pointer; }
+.stagefoot { display: grid; justify-items: center; gap: 8px; width: 100%; }
+.parts { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.parts::-webkit-scrollbar { display: none; }
+.parts button { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--card2) 80%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font-size: 13px; font-weight: 600; }
+.parts button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
+.parts .dot, .kv .dot { width: 7px; height: 7px; }
+[data-sev="ok"] > .dot { background: var(--ok); } [data-sev="warn"] > .dot { background: var(--warn); } [data-sev="crit"] > .dot { background: var(--crit); }
+[data-sev="none"] > .dot, [data-sev=""] > .dot { background: var(--fg3); }
+.klabel[data-sev="none"] > .dot { background: var(--accent); }
+.thr { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg2); width: min(100%, 240px); }
+.thr .bar { flex: 1; margin: 0; }
+
+/* kart drawing */
+.kart .shadow { fill: var(--shadow); }
+.kart .chassis { fill: var(--card2); stroke: var(--sep); stroke-width: 1.2; }
+.kart .seat { fill: var(--card); stroke: var(--sep); }
+.kart .frame { stroke: var(--fg3); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.kart .tyre { fill: var(--tyre); stroke: var(--fg3); stroke-width: 1; }
+.zone { fill: var(--fill); stroke: var(--fg3); stroke-width: 1.2; transition: fill .4s, stroke .4s; }
+.zone[data-sev="ok"] { fill: color-mix(in srgb, var(--accent) 30%, transparent); stroke: var(--accent); }
+.zone[data-sev="warn"] { fill: color-mix(in srgb, var(--warn) 45%, transparent); stroke: var(--warn); }
+.zone[data-sev="crit"] { fill: color-mix(in srgb, var(--crit) 60%, transparent); stroke: var(--crit); filter: drop-shadow(0 0 5px var(--crit)); animation: pulse 1.2s ease-in-out infinite; }
+.kart .lampz { fill: var(--fill); stroke: var(--fg3); transition: fill .3s; }
+.kart .beam { opacity: 0; transition: opacity .4s; }
+.kart[data-lamp="on"] .lampz { fill: var(--lamp); stroke: var(--lamp); }
+.kart[data-lamp="on"] .beam { opacity: 1; }
+.kart[data-lamp="auto"] .lampz { fill: color-mix(in srgb, var(--lamp) 40%, transparent); }
+
+.power { grid-area: power; } .batt { grid-area: batt; } .temps { grid-area: temps; } .pack { grid-area: pack; } .lap { grid-area: lap; } .modes { grid-area: mode; }
+.batt .row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.ring { width: 64px; height: 64px; flex: none; position: relative; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 7; }
+.ring .trk { stroke: var(--fill); }
+.ring .v { stroke: var(--ok); stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .4s, stroke .4s; }
+.ring .in { position: absolute; inset: 0; display: grid; place-items: center; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.ring .in small { font-size: 11px; color: var(--fg2); font-weight: 500; }
+.temps .row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; margin-top: 6px; text-align: center; }
+.temps .ring { width: 58px; height: 58px; margin: 0 auto; }
+.temps .ring svg { transform: rotate(135deg); }
+.temps .ring .trk { stroke-dasharray: 75 100; }
+.temps .ring .in { font-size: 15px; }
+.temps .name { font-size: 12px; color: var(--fg2); margin-top: 2px; white-space: nowrap; }
+.temps .state { font-size: 11px; font-weight: 600; min-height: 14px; }
+.state[data-sev="warn"] { color: var(--warn); } .state[data-sev="crit"] { color: var(--crit); }
+.modes { display: grid; gap: 10px; }
+.modes .r { display: grid; grid-template-columns: 64px minmax(0,1fr); align-items: center; gap: 10px; }
+.hint { font-size: 12px; color: var(--fg2); margin: 0; }
+
+/* segmented control */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); padding: 2px; border-radius: 10px; background: var(--fill); }
+.seg button { min-height: 36px; border: 0; border-radius: 8px; background: transparent; font-size: 14px; font-weight: 500; padding: 0 6px; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--card2); font-weight: 600; box-shadow: 0 2px 6px var(--shadow); }
+:root[data-theme="light"] .seg button[aria-pressed="true"] { background: #fff; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .seg button[aria-pressed="true"] { background: #fff; } }
+.seg button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ---------- other views ---------- */
+.view h2 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; margin: 6px 4px 10px; }
+.view h3 { font-size: 13px; font-weight: 500; color: var(--fg2); margin: 18px 4px 8px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { padding: 12px 14px; border-radius: 16px; }
+button.tile { display: block; width: 100%; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.chart { touch-action: pan-y; cursor: crosshair; }
+.tile .val { font-size: 24px; }
+.tile .val small { font-size: 13px; }
+.tile[data-sev="crit"] .val { color: var(--crit); }
+.tile .state { font-size: 12px; min-height: 15px; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+canvas { display: block; width: 100%; }
+.chart { height: 140px; margin-top: 8px; }
+.track { height: min(56vh, 420px); border-radius: 12px; overflow: hidden; background: var(--card2); z-index: 0; }
+.lapstats { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.lapstats .val { font-size: 26px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px;
+  background: var(--fill); font-weight: 600; font-size: 15px; }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn.danger { color: var(--crit); }
+.btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.note { font-size: 13px; color: var(--fg2); margin: 8px 4px 0; max-width: 62ch; }
+a { color: var(--accent); }
+
+/* settings: grouped inset list */
+.group { background: var(--card); border-radius: 14px; overflow: hidden; }
+.group > * + * { border-top: 1px solid var(--sep); }
+.rowi { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 16px; width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; text-align: left; font-size: 16px; }
+.group > .rowi:first-child { border-top: 0; }
+.rowi > span:first-child { flex: 1; }
+.rowi .muted { color: var(--fg2); }
+.rowi input { flex: 1.4; min-width: 0; border: 0; background: transparent; text-align: right; font-size: 16px; padding: 8px 0; color: var(--fg); }
+.rowi input::placeholder { color: var(--fg3); }
+.rowi input.switch { flex: none; width: 51px; padding: 0; text-align: left; }
+.chev { width: 16px; height: 16px; color: var(--fg3); transform: rotate(-90deg); flex: none; }
+.rowi input:focus { outline: none; }
+.rowi:focus-within { background: var(--fill); }
+.settings { max-width: 640px; margin: 0 auto; }
+.switch { appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 51px; height: 31px; margin: 0; border-radius: 999px; background: var(--fill); cursor: pointer; transition: background-color .2s; }
+.switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.3); transition: transform .2s; }
+.switch:checked { background: var(--ok); } .switch:checked::before { transform: translateX(20px); }
+
+/* part detail sheet: medium height so the highlighted part stays visible above it; scrolls for the rest */
+#partSheet { max-height: 56dvh; overflow-y: auto; overscroll-behavior: contain; }
+@media (min-width: 700px) and (min-aspect-ratio: 13/10) { #partSheet { max-height: 92dvh; } }
+.pstatus { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: -4px 0 12px; }
+.pstatus[data-sev="ok"] { color: var(--ok); } .pstatus[data-sev="warn"] { color: var(--warn); } .pstatus[data-sev="crit"] { color: var(--crit); } .pstatus[data-sev="none"] { color: var(--fg2); }
+.kv .rowi { min-height: 44px; font-size: 15px; }
+.kv .rowi .num { color: var(--fg2); }
+.faultlist { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.faultlist li { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; font-weight: 600; font-size: 14px; background: color-mix(in srgb, var(--crit) 18%, var(--card)); }
+
+/* sheet */
+.scrim { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.4); opacity: 0; transition: opacity .25s; }
+.sheet { position: fixed; z-index: 31; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 480px; border-radius: 22px 22px 0 0; border-bottom: 0;
+  padding: 8px max(18px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));
+  transform: translateY(105%); transition: transform .3s cubic-bezier(.2,.8,.2,1); box-shadow: 0 -10px 40px var(--shadow); }
+body.sheet-open .scrim { opacity: 1; }
+body.sheet-open .sheet { transform: none; }
+.grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--fg3); margin: 0 auto 8px; }
+.sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.sheet h2 { font-size: 20px; margin: 0; }
+.sheet .opts { display: grid; gap: 10px; }
+.sheet .btn { width: 100%; justify-content: flex-start; min-height: 52px; }
+.sheet .btn small { margin-left: auto; font-weight: 500; font-size: 13px; color: inherit; opacity: .75; }
+.sheet .btn[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.toast { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 10px 30px var(--shadow); }
+
+/* ---------- wide and short: phone sideways, tablet ---------- */
+@media (min-width: 700px) and (min-aspect-ratio: 13/10) {
+  .app { height: 100dvh; padding: 0; display: grid; grid-template-columns: auto minmax(0,1fr); grid-template-rows: auto minmax(0,1fr);
+    grid-template-areas: "tabs top" "tabs main"; }
+  .topbar { grid-area: top; position: static; flex-wrap: nowrap; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
+    padding: max(8px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 2px 2px; }
+  .alert { order: 0; flex: 1 1 auto; min-height: 32px; }
+  .alert[data-sev="ok"] { display: flex; background: transparent; }
+  .status { max-width: 40vw; min-height: 32px; }
+  .tabs { grid-area: tabs; position: static; transform: none; align-self: center; flex-direction: column; margin: 0 0 0 max(8px, env(safe-area-inset-left, 0px)); border-radius: 28px; }
+  .tabs button { min-width: 64px; min-height: 58px; padding: 4px; border-radius: 22px; }
+  main { grid-area: main; overflow: auto; padding: 6px max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) 10px; }
+  .drive { height: 100%; gap: 10px; grid-template-columns: minmax(180px,1fr) minmax(0,1.55fr) minmax(190px,1fr);
+    grid-template-rows: minmax(0,1fr) minmax(0,1fr) auto; grid-template-areas: "power stage batt" "pack stage temps" "lap stage mode"; }
+  .drive .card:not(.stage) { padding: 10px 12px; border-radius: 18px; }
+  .drive .val { font-size: 26px; }
+  .drive .lbl { font-size: 12px; }
+  .stage { padding: 8px; min-height: 0; }
+  .kartwrap { margin: -8px; width: calc(100% + 16px); height: calc(100% + 16px); }
+  .speedo { width: min(100%, 190px); }
+  .spd .big { font-size: 54px; }
+  .parts button { min-height: 30px; padding: 0 10px; font-size: 12px; }
+  .stagefoot { gap: 4px; }
+  .minimap { width: 64px; height: 64px; top: 8px; right: 8px; }
+  .batt .row { margin-top: 2px; }
+  .batt .ring { width: 54px; height: 54px; }
+  .temps .row { margin-top: 2px; }
+  .temps .ring { width: 46px; height: 46px; }
+  .temps .ring .in { font-size: 13px; }
+  .temps .ring { width: 42px; height: 42px; }
+  .temps .name { font-size: 11px; margin-top: 0; }
+  .temps .state:empty { display: none; }
+  .modes { gap: 6px; }
+  .modes .r { grid-template-columns: 1fr; gap: 4px; }
+  .modes .r .lbl { display: none; }
+  .seg button { min-height: 32px; font-size: 13px; }
+  .toast { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .sheet { bottom: auto; top: 50%; border-radius: 22px; border-bottom: 1px solid var(--glass-line); transform: translateY(-40%) scale(.96); opacity: 0;
+    transition: transform .25s, opacity .25s; padding-bottom: 18px; max-height: 92dvh; overflow: auto; }
+  body.sheet-open .sheet { transform: translateY(-50%); opacity: 1; }
+  .grabber { display: none; }
+}
+@media (min-width: 700px) and (min-aspect-ratio: 13/10) and (max-height: 430px) {
+  .drive .sub { font-size: 12px; }
+  .pack .bar, .power .bar { margin: 5px 0 3px; }
+}
+
+/* accessibility states */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-transparency: reduce) { .glass { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (prefers-contrast: more) { .glass { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--fg3); }
+  .card, .group { box-shadow: inset 0 0 0 1px var(--fg3); } :root { --fg2: var(--fg); } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-drive" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M3.5 10.5h6.3M14.2 10.5h6.3M12 14.2V21"/></symbol>
+  <symbol id="i-systems" viewBox="0 0 24 24"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/><path d="M4 21h16"/></symbol>
+  <symbol id="i-laps" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h13l-2.5 4L18 12H5"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16.5 9"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.4v.1"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><path d="M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3z"/><path d="M12 7.5v6M12 16.5v.1"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></symbol>
+  <symbol id="i-bt" viewBox="0 0 24 24"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 11a3.5 3.5 0 0 0 1 7z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar glass">
+    <div class="brand">
+      <img id="logo" src="parco-logo.png" alt="PARCO" hidden>
+      <span class="wordmark" id="wordmark" aria-label="PARCO, title sponsor">PARCO</span>
+    </div>
+    <div class="alert" id="alert" data-sev="none" role="status" aria-live="polite">
+      <svg class="ico"><use id="alertIco" href="#i-ok"/></svg><span class="tag" id="alertTag">Status</span><span id="alertText">Connect to the kart, watch online, or try the demo.</span>
+    </div>
+    <button class="status" id="chip" data-s="idle" type="button" aria-haspopup="dialog" aria-controls="sheet">
+      <span class="dot" aria-hidden="true"></span><span id="chipText">Not connected</span><svg class="ico" aria-hidden="true"><use href="#i-chev"/></svg>
+    </button>
+  </header>
+
+  <nav class="tabs glass" id="tabs" aria-label="Sections">
+    <button type="button" data-tab="drive"><svg class="ico" aria-hidden="true"><use href="#i-drive"/></svg>Drive</button>
+    <button type="button" data-tab="systems"><svg class="ico" aria-hidden="true"><use href="#i-systems"/></svg>Systems</button>
+    <button type="button" data-tab="laps"><svg class="ico" aria-hidden="true"><use href="#i-laps"/></svg>Laps</button>
+    <button type="button" data-tab="settings"><svg class="ico" aria-hidden="true"><use href="#i-settings"/></svg>Settings</button>
+  </nav>
+
+  <main id="main">
+    <!-- Drive -->
+    <section class="view drive" id="view-drive" aria-label="Drive">
+      <div class="card stage">
+        <div class="kartwrap">
+          <svg class="kart" id="kart" viewBox="0 0 160 230" role="img" aria-label="Kart, top view" data-lamp="auto">
+            <defs><linearGradient id="beamG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="var(--lamp)" stop-opacity=".55"/><stop offset="1" stop-color="var(--lamp)" stop-opacity="0"/></linearGradient></defs>
+            <path class="beam" d="M60 22 L40 -24 L76 -24 L68 22Z M92 22 L84 -24 L120 -24 L100 22Z" fill="url(#beamG)"/>
+            <ellipse class="shadow" cx="80" cy="120" rx="76" ry="104" opacity=".35"/>
+            <path class="frame" d="M44 56 H116 M42 178 H118"/>
+            <g data-part="tyres"><rect class="tyre" x="12" y="36" width="24" height="40" rx="7"/><rect class="tyre" x="124" y="36" width="24" height="40" rx="7"/>
+            <rect class="tyre" x="6" y="152" width="30" height="52" rx="8"/><rect class="tyre" x="124" y="152" width="30" height="52" rx="8"/></g>
+            <path class="chassis" d="M62 14 Q80 8 98 14 L108 52 L116 120 L118 186 Q118 214 80 216 Q42 214 42 186 L44 120 L52 52 Z"/>
+            <g data-part="headlights"><rect class="lampz" x="62" y="16" width="10" height="6" rx="2"/><rect class="lampz" x="88" y="16" width="10" height="6" rx="2"/></g>
+            <rect class="zone" id="z-battery" data-part="battery" x="56" y="44" width="48" height="40" rx="6"/>
+            <rect class="seat" x="52" y="92" width="25" height="40" rx="8"/><rect class="seat" x="83" y="92" width="25" height="40" rx="8"/>
+            <path class="frame" d="M48 138 H112"/>
+            <rect class="zone" id="z-inverter" data-part="inverter" x="52" y="148" width="26" height="22" rx="4"/>
+            <rect class="zone" id="z-motor" data-part="motor" x="84" y="146" width="26" height="40" rx="12"/>
+          </svg>
+          <div class="stage3d" id="stage3d" aria-hidden="true"></div>
+        </div>
+        <div class="speedo">
+          <svg viewBox="0 0 220 128" aria-hidden="true">
+            <path class="arc trk" d="M20 112 A90 90 0 0 1 200 112" pathLength="100"/>
+            <path class="arc red" d="M20 112 A90 90 0 0 1 200 112" pathLength="100" id="redArc"/>
+            <path class="arc v" d="M20 112 A90 90 0 0 1 200 112" pathLength="100" id="rpmArc"/>
+            <text x="20" y="127" text-anchor="middle">0</text><text x="200" y="127" text-anchor="middle" id="rpmMaxTxt">7k</text>
+          </svg>
+          <div class="spd"><span class="big num" id="kmh">--</span><span class="u num" id="rpm">km/h · -- rpm</span></div>
+        </div>
+        <canvas class="minimap" id="cTrackMini" role="button" aria-label="Open the dashboard with the live map"></canvas>
+        <div class="stagefoot">
+          <p class="khint" id="kHint">Tap the kart for the driver's view · hold it to see its parts</p>
+          <div class="parts" id="parts" role="group" aria-label="Kart parts, tap for live data">
+            <button type="button" data-part="driver" data-sev="none"><span class="dot"></span>Driver</button>
+            <button type="button" data-part="battery" data-sev="none"><span class="dot"></span>Battery</button>
+            <button type="button" data-part="inverter" data-sev="none"><span class="dot"></span>Controller</button>
+            <button type="button" data-part="motor" data-sev="none"><span class="dot"></span>Motor</button>
+            <button type="button" data-part="tyres" data-sev="none"><span class="dot"></span>Tyres</button>
+            <button type="button" data-part="brakes" data-sev="none"><span class="dot"></span>Brakes</button>
+            <button type="button" data-part="headlights" data-sev="none"><span class="dot"></span>Headlights</button>
+            <button type="button" data-part="rearlights" data-sev="none"><span class="dot"></span>Rear lights</button>
+          </div>
+          <div class="thr"><span>Throttle</span><div class="bar"><i id="thrBar"></i></div><span class="num" id="thrTxt">--</span></div>
+        </div>
+      </div>
+
+      <div class="card power"><div class="lbl">Power</div>
+        <div class="val num"><span id="kw">--</span><small>kW</small></div>
+        <div class="bar"><i id="kwBar"></i><b id="kwZero"></b></div>
+        <div class="sub num" id="amps">-- A</div></div>
+
+      <div class="card pack"><div class="lbl">Pack</div>
+        <div class="val num"><span id="vpack">--</span><small>V</small></div>
+        <div class="bar"><i id="vBar"></i></div>
+        <div class="sub num" id="cells">Cells --</div></div>
+
+      <div class="card batt"><div class="lbl">Battery</div>
+        <div class="row">
+          <div class="ring"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="trk" cx="32" cy="32" r="27" pathLength="100"/><circle class="v" id="socRing" cx="32" cy="32" r="27" pathLength="100"/></svg>
+            <div class="in num"><span><span id="soc">--</span><small>%</small></span></div></div>
+          <div style="min-width:0"><div class="val num" style="font-size:22px"><span id="range">--</span><small>km</small></div><div class="sub" id="rangeSub">range estimate</div></div>
+        </div></div>
+
+      <div class="card temps"><div class="lbl">Temperatures</div>
+        <div class="row" id="tempRow"></div></div>
+
+      <div class="card lap"><div class="lbl"><span id="lapLbl">Lap timer</span>
+        <button class="iconbtn" type="button" id="btnLapDrive" aria-label="Mark lap"><svg class="ico"><use href="#i-flag"/></svg></button></div>
+        <div class="val num" id="lapNow">0:00.0</div>
+        <div class="sub num" id="lapSub">Tap the flag at the start line</div></div>
+
+      <div class="card modes">
+        <div class="r"><div class="lbl">Mode</div>
+          <div class="seg" id="segMode" role="group" aria-label="Drive mode"><button type="button" data-v="0">Eco</button><button type="button" data-v="1">Normal</button><button type="button" data-v="2">Sport</button></div></div>
+        <div class="r"><div class="lbl">Lamps</div>
+          <div class="seg" id="segLamp" role="group" aria-label="Headlamps"><button type="button" data-v="0">Auto</button><button type="button" data-v="1">On</button><button type="button" data-v="2">Off</button></div></div>
+        <p class="hint" id="ctlState">Connect by Bluetooth to use</p>
+      </div>
+    </section>
+
+    <!-- Systems -->
+    <section class="view" id="view-systems" aria-label="Systems" hidden>
+      <h2>Systems</h2>
+      <div class="tiles" id="tiles"></div>
+      <h3>Last 2 minutes</h3>
+      <div class="charts">
+        <div class="card"><div class="lbl">Speed <span>km/h</span></div><canvas class="chart" id="cSpeed"></canvas></div>
+        <div class="card"><div class="lbl">Power <span>kW</span></div><canvas class="chart" id="cPower"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Laps -->
+    <section class="view" id="view-laps" aria-label="Laps" hidden>
+      <h2>Laps</h2>
+      <div class="card">
+        <div class="lapstats">
+          <button class="btn primary" type="button" id="btnLap"><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg>Mark lap</button>
+          <div><div class="lbl">Last lap</div><div class="val num" id="lastLap">--</div></div>
+          <div><div class="lbl">Best lap</div><div class="val num" id="bestLap">--</div></div>
+          <div><div class="lbl">Laps</div><div class="val num" id="lapCount">0</div></div>
+        </div>
+      </div>
+      <h3>Track <span id="gpsText">· waiting for GPS</span></h3>
+      <div class="card"><div class="track" id="lapMap" role="application" aria-label="Session track map"></div><p class="note" id="mapLink"></p></div>
+      <h3>Session</h3>
+      <div class="card">
+        <div class="lbl" id="recCount">0 samples recorded</div>
+        <div class="btns"><button class="btn" type="button" id="btnCsv">Download CSV</button><button class="btn danger" type="button" id="btnClear">Clear Session</button></div>
+        <p class="note">Everything received is recorded on this phone until you clear it. The kart also keeps its own SD card log.</p>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="view settings" id="view-settings" aria-label="Settings" hidden>
+      <h2>Settings</h2>
+      <div class="group"><button class="rowi" type="button" id="srcRow"><span>Data source</span><span class="muted" id="srcVal">None</span><svg class="ico chev" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+      <h3>Kart controls</h3>
+      <div class="group"><label class="rowi" for="pin"><span>Control PIN</span><input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="Set in kart firmware" autocomplete="off"></label>
+        <div class="rowi"><span>Controls</span><span class="muted" id="pinState">Not connected</span></div></div>
+      <p class="note">Drive mode only lowers the battery current limit the motor controller already obeys, and the kart accepts a change only while stopped. Eco is the start-up mode. Throttle, contactors and safety functions are never controlled from the app.</p>
+      <h3>Online view</h3>
+      <div class="group"><label class="rowi" for="fbUrl"><span>Firebase URL</span><input id="fbUrl" type="url" placeholder="https://…firebaseio.com" autocomplete="off"></label></div>
+      <h3>Battery</h3>
+      <div class="group"><label class="rowi" for="packAh"><span>Pack capacity (Ah)</span><input id="packAh" type="number" inputmode="decimal" min="1" max="500" step="1" placeholder="40"></label></div>
+      <p class="note">Used only for the range estimate, with the 336 V nominal pack voltage and your average Wh/km over the last two minutes.</p>
+      <h3>Display</h3>
+      <div class="group"><label class="rowi" for="opt3d"><span>3D kart</span><input class="switch" id="opt3d" type="checkbox" role="switch" checked></label></div>
+      <p class="note">Turn off on a slow phone to show a flat top view instead. Takes effect when the app reopens.</p>
+      <div id="installBox" hidden>
+        <h3>App</h3>
+        <div class="group"><button class="rowi" type="button" id="btnInstall"><span>Install on This Phone</span><svg class="ico chev" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+      </div>
+      <h3>About</h3>
+      <div class="group"><div class="rowi"><span>GIKI Electric Crosskart</span><span class="muted">Telemetry v2</span></div><div class="rowi"><span>Title sponsor</span><span class="muted">PARCO</span></div></div>
+    </section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet glass" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="grabber" aria-hidden="true"></div>
+  <header><h2 id="sheetTitle">Data source</h2><button class="iconbtn" style="margin:0" type="button" id="sheetClose" aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></header>
+  <div class="opts">
+    <button class="btn primary" id="btnBle" type="button"><svg class="ico" aria-hidden="true"><use href="#i-bt"/></svg>Connect to Kart<small>Bluetooth</small></button>
+    <button class="btn" id="btnCloud" type="button"><svg class="ico" aria-hidden="true"><use href="#i-cloud"/></svg>Watch Online<small>Firebase</small></button>
+    <button class="btn" id="btnDemo" type="button" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg>Demo Data<small>No kart needed</small></button>
+    <button class="btn danger" id="btnStop" type="button" hidden><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Disconnect</button>
+  </div>
+</div>
+<div class="sheet glass" id="partSheet" role="dialog" aria-modal="true" aria-labelledby="partTitle" hidden>
+  <div class="grabber" aria-hidden="true"></div>
+  <header><h2 id="partTitle">Part</h2><button class="iconbtn" style="margin:0" type="button" id="partClose" aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></header>
+  <div class="pstatus" id="partStatus" data-sev="none"><svg class="ico" aria-hidden="true"><use id="partStatusIco" href="#i-ok"/></svg><span id="partStatusText">No data yet</span></div>
+  <div class="group kv" id="partRows" aria-live="off"></div>
+  <ul class="faultlist" id="partFaults"></ul>
+  <p class="note" id="partNote" hidden></p>
+</div>
+<div class="toast glass" id="toast" role="status" hidden></div>
+
+<script>
+"use strict";
+// ---------- constants shared with the J1 firmware (app_link.h) ----------
+const NUS = "6e400001-b5a3-f393-e0a9-e50e24dcca9e", NUS_RX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e", NUS_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+const FAULT_TEXT = ["BMS data lost, stop", "Motor controller link lost", "Aux unit lost", "Motor controller fault", "Weak cell",
+  "Low battery", "Motor hot", "Inverter hot", "12 V battery low", "No GPS fix"];
+const CRIT_MASK = (1 << 0) | (1 << 1) | (1 << 3);
+const MC_FAULT = ["Overcurrent", "Bus overvoltage", "Bus undervoltage", "Motor overtemp", "Inverter overtemp", "Hall sensor", "Throttle",
+  "Gate driver", "Precharge", "Contactor weld", "Brake + throttle", "Safety loop open", "ECU link lost"];
+const MC_STATE = ["Booting", "Safety loop open", "Precharging", "HV ready", "Driving", "Fault"];
+const MODES = ["Eco", "Normal", "Sport"], LAMPS = ["Auto", "On", "Off"];
+// display ranges (estimates, tune on the kart)
+const RPM_MAX = 7000, RPM_RED = 6000, KW_MAX = 70, KW_MIN = -15, V_MIN = 290, V_MAX = 383, NOMINAL_V = 336, DEFAULT_AH = 40, DEFAULT_WH_KM = 90;
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fin = x => typeof x === "number" && isFinite(x);
+const fmt = (x, d = 0) => { if (!fin(x)) return "--"; const r = x.toFixed(d); return /^-0(\.0+)?$/.test(r) ? r.slice(1) : r; };
+const clamp01 = x => Math.max(0, Math.min(1, x));
+let toastTimer;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3000); }
+
+$("logo").addEventListener("load", () => { $("logo").hidden = false; $("wordmark").hidden = true; });
+$("logo").addEventListener("error", () => { $("logo").hidden = true; });
+
+// ---------- tiles (Systems) ----------
+const TILES = [
+  ["vpack", "Pack voltage", "V", 1], ["ipack", "Pack current", "A", 1], ["cellHi", "Highest cell", "V", 3], ["cellLo", "Lowest cell", "V", 3],
+  ["tBatt", "Battery temp", "°C", 0], ["tMot", "Motor temp", "°C", 0], ["tInv", "Inverter temp", "°C", 0], ["coolant", "Coolant", "°C", 0],
+  ["v12", "12 V battery", "V", 2], ["thr", "Throttle", "%", 0], ["mcState", "Motor controller", "", 0], ["gps", "GPS", "sats", 0], ["incline", "Pitch / roll", "°", 0]];
+const TILE_PART = { vpack: "battery", ipack: "battery", cellHi: "battery", cellLo: "battery", tBatt: "battery", v12: "battery", tMot: "motor", thr: "motor",
+  tInv: "inverter", coolant: "inverter", mcState: "inverter", gps: "tyres", incline: "tyres" };
+// [warn, crit, direction] : direction +1 = high is bad, -1 = low is bad (estimates, tune on the kart)
+const LIMITS = { tBatt: [45, 55, 1], tMot: [110, 140, 1], tInv: [70, 85, 1], coolant: [55, 65, 1], v12: [12.5, 11.6, -1], cellLo: [3.0, 2.8, -1], cellHi: [3.5, 3.6, 1] };
+$("tiles").innerHTML = TILES.map(([k, l]) => `<button type="button" class="card tile" id="t_${k}" data-part="${TILE_PART[k]}"><div class="lbl">${l}</div><div class="val num" id="v_${k}">--</div><div class="state" id="s_${k}"></div></button>`).join("");
+$("tiles").addEventListener("click", e => { const t = e.target.closest("[data-part]"); if (t) openPart(t.dataset.part); });
+function sev(k, x) {
+  const L = LIMITS[k]; if (!L || !fin(x)) return "";
+  const [w, c, dir] = L; if (dir > 0) return x >= c ? "crit" : x >= w ? "warn" : "ok";
+  return x <= c ? "crit" : x <= w ? "warn" : "ok";
+}
+const sevWord = (k, s) => !s || s === "ok" ? "" : (LIMITS[k] && LIMITS[k][2] < 0) ? (s === "crit" ? "Too low" : "Low") : (s === "crit" ? "Too high" : "High");
+function setTile(k, text, unit, s, word) {
+  $("v_" + k).innerHTML = unit ? `${text}<small>${unit}</small>` : text; $("t_" + k).dataset.sev = s || "";
+  const st = $("s_" + k); st.dataset.sev = s || ""; st.textContent = word ?? sevWord(k, s);
+}
+
+// temperature rings (Drive)
+const TEMPS = [["tMot", "Motor", 160], ["tInv", "Inverter", 100], ["tBatt", "Battery", 65]];
+$("tempRow").innerHTML = TEMPS.map(([k, l]) => `<div><div class="ring"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="trk" cx="32" cy="32" r="27" pathLength="100"/><circle class="v" id="r_${k}" cx="32" cy="32" r="27" pathLength="100"/></svg>
+  <div class="in num"><span id="d_${k}">--</span></div></div><div class="name">${l}</div><div class="state" id="ds_${k}"></div></div>`).join("");
+const sevColor = s => css(s === "crit" ? "--crit" : s === "warn" ? "--warn" : "--ok");
+function setRing(id, frac, span, color) { const el = $(id); el.style.strokeDashoffset = 100 - span * clamp01(frac); if (color) el.style.stroke = color; }
+
+// ---------- data model ----------
+// Every source is turned into one sample: { t, kmh, rpm, soc, v, i, kw, cellHi, cellLo, tBatt, tMot, tInv, coolant, v12, mcState, mcFault, faults, lat, lon, sats, fix, pitch, roll, auxFlags, mode, lamp, thr }
+const num = s => { const x = parseFloat(s); return isFinite(x) ? x : null; };
+function fromBleLine(line) {
+  const f = line.split(",");
+  if (f[0] !== "K1" || f.length < 27) return null;
+  const n = f.map(num);
+  const s = { kmh: n[1], rpm: n[2], soc: n[3], v: n[4], i: n[5], kw: n[6], cellHi: n[7], cellLo: n[8], tBatt: n[9], tMot: n[10], tInv: n[11],
+    coolant: n[12], v12: n[13], mcState: n[14], mcFault: parseInt(f[15], 16), faults: parseInt(f[16], 16), lat: n[17], lon: n[18],
+    sats: n[19], fix: n[20] === 1, pitch: n[21], roll: n[22], auxFlags: n[23], mode: n[24], lamp: n[25], thr: n[26] };
+  if (s.coolant !== null && s.coolant <= -99) s.coolant = null;
+  if (s.mcState === 255) s.mcState = null;
+  return s;
+}
+function fromCloud(o) {
+  if (!o || typeof o !== "object") return null;
+  const g = o.gps || {}, m = o.mc || {}, b = o.bms || {}, a = o.aux || {}, im = o.imu || {}, app = o.app || {};
+  const v = num(b.v), i = num(b.i);
+  return { kmh: num(g.kmh), rpm: num(m.rpm), soc: num(b.soc), v, i, kw: fin(v) && fin(i) ? v * i / 1000 : null, cellHi: num(b.cellHi), cellLo: num(b.cellLo),
+    tBatt: num(b.tHi), tMot: num(m.tmot), tInv: num(m.tinv), coolant: num(a.coolant) <= -99 ? null : num(a.coolant), v12: num(a.v12),
+    mcState: fin(num(m.state)) ? num(m.state) : null, mcFault: num(m.fault) || 0, faults: num(o.faults) || 0, lat: num(g.lat), lon: num(g.lon),
+    sats: num(g.sats), fix: !!g.fix, pitch: num(im.pitch), roll: num(im.roll), auxFlags: num(a.flags), mode: fin(num(app.mode)) ? num(app.mode) : null,
+    lamp: fin(num(app.lamp)) ? num(app.lamp) : null, thr: num(m.thr) };
+}
+
+const HIST_MS = 120000;
+let hist = [], track = [], rec = [], lastRx = 0, last = null, source = null, lapNo = 0;
+function onSample(s) {
+  s.t = Date.now(); lastRx = s.t; last = s; s.lap = lapNo;
+  hist.push(s); while (hist.length && hist[0].t < s.t - HIST_MS) hist.shift();
+  if (s.fix && fin(s.lat) && fin(s.lon) && (s.lat !== 0 || s.lon !== 0)) { track.push([s.lat, s.lon]); if (track.length > 4000) track.shift(); }
+  if (rec.length < 60000) rec.push(s);
+  render(s);
+}
+
+// range: pack energy left / recent Wh per km (estimate)
+function whPerKm() {
+  let e = 0, d = 0;
+  for (let j = 1; j < hist.length; j++) {
+    const a = hist[j - 1], b = hist[j], dt = (b.t - a.t) / 3600000;
+    if (dt <= 0 || dt > 0.0003) continue;                                    // skip gaps over ~1 s
+    if (fin(b.kw)) e += b.kw * 1000 * dt; if (fin(b.kmh)) d += b.kmh * dt;
+  }
+  return d > 0.3 && e > 0 ? e / d : null;
+}
+
+// ---------- rendering ----------
+function worst(...l) { return l.includes("crit") ? "crit" : l.includes("warn") ? "warn" : l.includes("ok") ? "ok" : ""; }
+function render(s) {
+  // speed + rpm arc
+  $("kmh").textContent = fmt(s.kmh, 0);
+  $("rpm").textContent = `km/h · ${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
+  const ra = $("rpmArc"); ra.style.strokeDashoffset = 100 - 100 * clamp01(Math.abs(s.rpm || 0) / RPM_MAX); ra.classList.toggle("hot", Math.abs(s.rpm || 0) >= RPM_RED);
+
+  // power, centre-zero bar: drive to the right, regen to the left
+  $("kw").textContent = fmt(s.kw, 1);
+  const z = -KW_MIN / (KW_MAX - KW_MIN) * 100, kb = $("kwBar"), kw = fin(s.kw) ? Math.max(KW_MIN, Math.min(KW_MAX, s.kw)) : 0, w = Math.abs(kw) / (KW_MAX - KW_MIN) * 100;
+  kb.style.left = (kw >= 0 ? z : z - w) + "%"; kb.style.width = w + "%"; kb.style.backgroundColor = kw < 0 ? css("--ok") : css("--accent");
+  $("amps").textContent = `${fmt(s.i, 1)} A${fin(s.kw) && s.kw < 0 ? " · regen" : ""}`;
+
+  // pack
+  $("vpack").textContent = fmt(s.v, 1);
+  $("vBar").style.width = fin(s.v) ? clamp01((s.v - V_MIN) / (V_MAX - V_MIN)) * 100 + "%" : "0";
+  const sc = worst(sev("cellLo", s.cellLo), sev("cellHi", s.cellHi));
+  $("vBar").style.backgroundColor = sc === "crit" ? css("--crit") : sc === "warn" ? css("--warn") : css("--accent");
+  $("cells").textContent = fin(s.cellLo) ? `Cells ${fmt(s.cellLo, 2)}–${fmt(s.cellHi, 2)} V` : "Cells --";
+
+  // battery + range
+  $("soc").textContent = fmt(s.soc, 0);
+  setRing("socRing", (s.soc || 0) / 100, 100, !fin(s.soc) ? css("--fg3") : s.soc < 10 ? css("--crit") : s.soc < 20 ? css("--warn") : css("--ok"));
+  const ah = parseFloat(store.get("packAh", "")) || DEFAULT_AH, wk = whPerKm();
+  const rng = fin(s.soc) ? s.soc / 100 * NOMINAL_V * ah / (wk || DEFAULT_WH_KM) : null;
+  $("range").textContent = fin(rng) ? fmt(rng, rng < 10 ? 1 : 0) : "--";
+  $("rangeSub").textContent = wk ? `est. at ${fmt(wk, 0)} Wh/km` : "estimate";
+
+  // temperature rings
+  for (const [k, , max] of TEMPS) {
+    const sv = sev(k, s[k]);
+    $("d_" + k).textContent = fin(s[k]) ? fmt(s[k], 0) + "°" : "--";
+    setRing("r_" + k, (s[k] || 0) / max, 75, fin(s[k]) ? sevColor(sv) : css("--fg3"));
+    const st = $("ds_" + k); st.dataset.sev = sv; st.textContent = sevWord(k, sv);
+  }
+
+  // throttle, mode, lamps
+  $("thrBar").style.width = fin(s.thr) ? clamp01(s.thr / 100) * 100 + "%" : "0";
+  $("thrTxt").textContent = fin(s.thr) ? fmt(s.thr, 0) + "%" : "--";
+
+  // faults
+  const list = [], has = b => !!(s.faults & (1 << b)), mcHas = b => !!(s.mcFault & (1 << b));
+  let crit = false;
+  for (let b = 0; b < FAULT_TEXT.length; b++) if (has(b)) { list.push(FAULT_TEXT[b]); if (CRIT_MASK & (1 << b)) crit = true; }
+  for (let b = 0; b < MC_FAULT.length; b++) if (mcHas(b)) { list.push("MC: " + MC_FAULT[b]); crit = true; }
+  if (s.mcState === 5) crit = true;
+  const al = $("alert");
+  if (list.length) { al.dataset.sev = crit ? "crit" : "warn"; $("alertText").textContent = list.join(" · "); $("alertTag").textContent = crit ? "Stop" : "Warning"; $("alertIco").setAttribute("href", crit ? "#i-stop" : "#i-warn"); }
+  else { al.dataset.sev = "ok"; $("alertText").textContent = "All systems normal"; $("alertTag").textContent = ""; $("alertIco").setAttribute("href", "#i-ok"); }
+
+  // kart zones: temperature limits plus the fault bits that belong to each part
+  const zb = has(0) ? "crit" : worst(sev("tBatt", s.tBatt), sc, has(4) || has(5) ? "warn" : "");
+  const zm = mcHas(3) || mcHas(5) ? "crit" : worst(sev("tMot", s.tMot), has(6) ? "warn" : "");
+  const zi = has(1) || has(3) || s.mcState === 5 || (s.mcFault & ~((1 << 3) | (1 << 5))) ? "crit" : worst(sev("tInv", s.tInv), has(7) ? "warn" : "");
+  $("z-battery").dataset.sev = zb; $("z-motor").dataset.sev = zm; $("z-inverter").dataset.sev = zi;
+  $("kart").dataset.lamp = s.lamp === 1 ? "on" : s.lamp === 2 ? "off" : "auto";
+  const word = z => z === "crit" ? "fault" : z === "warn" ? "warning" : z === "ok" ? "normal" : "no data";
+  $("kart").setAttribute("aria-label", `Kart, top view. Battery ${word(zb)}, motor ${word(zm)}, inverter ${word(zi)}, lamps ${fin(s.lamp) ? LAMPS[s.lamp].toLowerCase() : "unknown"}.`);
+  // part states for the 3D kart and the parts row; temp = 0 at 20 °C, 1 at the critical limit
+  const tf = (k, x) => fin(x) ? (x - 20) / (LIMITS[k][1] - 20) : null;
+  zoneState = { battery: { sev: zb || "none", temp: tf("tBatt", s.tBatt) }, motor: { sev: zm || "none", temp: tf("tMot", s.tMot) },
+    inverter: { sev: zi || "none", temp: tf("tInv", s.tInv) }, brakes: { sev: mcHas(10) ? "warn" : "none" }, tyres: { sev: "none" },
+    headlights: { sev: "none" }, rearlights: { sev: "none" }, driver: { sev: "none" }, lamp: s.lamp };
+  for (const b of $("parts").querySelectorAll("button")) b.dataset.sev = zoneState[b.dataset.part].sev;
+  window.kartState = zoneState; if (window.kart3d) window.kart3d.update(zoneState);
+  if (partOpen) renderPart();
+  if (window.hudRender) hudRender(s); else if (window.mapsTick) mapsTick();
+
+  // Systems tiles
+  setTile("vpack", fmt(s.v, 1), "V");
+  setTile("ipack", fmt(s.i, 1), "A");
+  setTile("cellHi", fmt(s.cellHi, 3), "V", sev("cellHi", s.cellHi));
+  setTile("cellLo", fmt(s.cellLo, 3), "V", sev("cellLo", s.cellLo));
+  for (const k of ["tBatt", "tMot", "tInv", "coolant"]) setTile(k, fin(s[k]) ? fmt(s[k], 0) : k === "coolant" ? "No sensor" : "--", fin(s[k]) ? "°C" : "", sev(k, s[k]));
+  setTile("v12", fmt(s.v12, 2), "V", sev("v12", s.v12));
+  setTile("thr", fmt(s.thr, 0), "%");
+  setTile("mcState", fin(s.mcState) ? (MC_STATE[s.mcState] || "State " + s.mcState) : "--", "", s.mcState === 5 ? "crit" : s.mcState === 4 ? "ok" : "", s.mcState === 5 ? "Fault" : "");
+  setTile("gps", s.fix ? fmt(s.sats, 0) : "No fix", s.fix ? "sats" : "", s.fix ? "ok" : "warn", s.fix ? "" : "Waiting");
+  const inc = fin(s.pitch) && fin(s.roll) ? Math.max(Math.abs(s.pitch), Math.abs(s.roll)) : null, incS = fin(inc) ? (inc > 30 ? "crit" : inc > 20 ? "warn" : "ok") : "";
+  setTile("incline", fin(s.pitch) ? `${fmt(s.pitch, 0)}° / ${fmt(s.roll, 0)}°` : "--", "", incS, incS === "crit" ? "Too steep" : incS === "warn" ? "Steep" : "");
+
+  $("gpsText").textContent = s.fix ? `· ${fmt(s.lat, 5)}, ${fmt(s.lon, 5)}` : "· no GPS fix";
+  $("mapLink").innerHTML = s.fix ? `<a href="https://maps.google.com/?q=${s.lat.toFixed(6)},${s.lon.toFixed(6)}" target="_blank" rel="noopener">Open kart position in Google Maps</a>` : "";
+  $("recCount").textContent = `${rec.length.toLocaleString("en-US")} samples recorded`;
+  syncControls();
+}
+
+function sizeCanvas(c) {
+  const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return [g, r.width, r.height];
+}
+const visible = c => c.getBoundingClientRect().width > 0;
+function niceMax(x) { const p = Math.pow(10, Math.floor(Math.log10(x))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= x) return m * p; return 10 * p; }
+function drawChart(id, key, color, floorMax, allowNeg) {
+  if (!visible($(id))) return;
+  const [g, w, h] = sizeCanvas($(id)); g.clearRect(0, 0, w, h);
+  const now = Date.now(), pts = hist.filter(s => fin(s[key]));
+  let hi = floorMax, lo = 0;
+  for (const s of pts) { hi = Math.max(hi, s[key]); if (allowNeg) lo = Math.min(lo, s[key]); }
+  hi = niceMax(hi); if (lo < 0) lo = -niceMax(-lo);
+  const L = 34, R = 8, T = 8, B = 18, X = t => L + (w - L - R) * (1 - (now - t) / HIST_MS), Y = v => T + (h - T - B) * (1 - (v - lo) / (hi - lo));
+  g.font = "11px " + css("--font"); g.fillStyle = css("--fg2"); g.strokeStyle = css("--sep"); g.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4, y = Y(v); g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.textAlign = "right"; g.fillText(+v.toFixed(1), L - 6, y + 4); }
+  g.textAlign = "left"; g.fillText("-2 min", L, h - 4); g.textAlign = "right"; g.fillText("now", w - R, h - 4);
+  if (pts.length < 2) return;
+  g.beginPath(); pts.forEach((s, j) => j ? g.lineTo(X(s.t), Y(s[key])) : g.moveTo(X(s.t), Y(s[key])));
+  g.strokeStyle = color; g.lineWidth = 2; g.lineJoin = "round"; g.stroke();
+  g.lineTo(X(pts[pts.length - 1].t), Y(Math.max(lo, 0))); g.lineTo(X(pts[0].t), Y(Math.max(lo, 0))); g.closePath();
+  g.globalAlpha = .14; g.fillStyle = color; g.fill(); g.globalAlpha = 1;
+  const e = pts[pts.length - 1]; g.beginPath(); g.arc(X(e.t), Y(e[key]), 4, 0, 7); g.fillStyle = color; g.fill();
+  const hx = chartHover[id]; if (hx == null || hx < L || hx > w - R) return;              // touch readout
+  const t = now - (1 - (hx - L) / (w - L - R)) * HIST_MS; let b = pts[0];
+  for (const p of pts) if (Math.abs(p.t - t) < Math.abs(b.t - t)) b = p;
+  const x = X(b.t); g.strokeStyle = css("--fg3"); g.lineWidth = 1; g.beginPath(); g.moveTo(x, T); g.lineTo(x, h - B); g.stroke();
+  g.beginPath(); g.arc(x, Y(b[key]), 4, 0, 7); g.fillStyle = color; g.fill();
+  const rows = [`${Math.round((now - b.t) / 1000)} s ago`, `${fmt(b[key], key === "kw" ? 1 : 0)} ${key === "kw" ? "kW" : "km/h"}`];
+  g.font = "12px " + css("--font"); const bw = Math.max(...rows.map(r => g.measureText(r).width)) + 16, bx = x + bw + 10 > w ? x - bw - 8 : x + 8;
+  g.fillStyle = css("--card2"); g.beginPath(); g.roundRect(bx, T, bw, 40, 8); g.fill(); g.textAlign = "left";
+  rows.forEach((r, j) => { g.fillStyle = j ? css("--fg") : css("--fg2"); g.fillText(r, bx + 8, T + 18 + j * 16); });
+}
+const chartHover = {};
+for (const id of ["cSpeed", "cPower"]) {
+  const c = $(id), at = e => { const r = c.getBoundingClientRect(); chartHover[id] = e.clientX - r.left; frame(); };
+  c.addEventListener("pointermove", at); c.addEventListener("pointerdown", at);
+  c.addEventListener("pointerleave", () => { chartHover[id] = null; frame(); });
+}
+function drawTrack(id, mini) {
+  const c = $(id); if (!visible(c)) return;
+  const [g, w, h] = sizeCanvas(c); g.clearRect(0, 0, w, h);
+  if (track.length < 2) { g.fillStyle = css("--fg2"); g.font = (mini ? "11px " : "14px ") + css("--font"); g.textAlign = "center";
+    g.fillText(mini ? "No GPS" : "Track appears once GPS has a fix", w / 2, h / 2 + 4); return; }
+  let la0 = Infinity, la1 = -Infinity, lo0 = Infinity, lo1 = -Infinity;
+  for (const [a, b] of track) { la0 = Math.min(la0, a); la1 = Math.max(la1, a); lo0 = Math.min(lo0, b); lo1 = Math.max(lo1, b); }
+  const k = Math.cos((la0 + la1) / 2 * Math.PI / 180), mx = (lo1 - lo0) * k * 111320, my = (la1 - la0) * 111320;  // metres
+  const pad = mini ? 8 : 16, foot = mini ? 0 : 14, sc = Math.min((w - 2 * pad) / Math.max(mx, 20), (h - 2 * pad - foot) / Math.max(my, 20));
+  const ox = (w - mx * sc) / 2, oy = (h - foot - my * sc) / 2;
+  const P = ([a, b]) => [ox + (b - lo0) * k * 111320 * sc, oy + (la1 - a) * 111320 * sc];
+  g.strokeStyle = css("--accent"); g.lineWidth = mini ? 1.6 : 2.5; g.lineJoin = "round"; g.lineCap = "round"; g.beginPath();
+  track.forEach((p, j) => { const [x, y] = P(p); j ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+  const [sx, sy] = P(track[0]), [ex, ey] = P(track[track.length - 1]);
+  if (!mini) { g.fillStyle = css("--fg2"); g.beginPath(); g.arc(sx, sy, 4, 0, 7); g.fill(); }
+  g.fillStyle = css("--fg"); g.beginPath(); g.arc(ex, ey, mini ? 3.5 : 6, 0, 7); g.fill();
+  g.strokeStyle = css("--accent"); g.lineWidth = 2; g.stroke();
+  if (mini) return;
+  const m = niceMax(Math.max(mx, my) / 4), px = m * sc;                         // scale bar
+  g.strokeStyle = css("--fg2"); g.lineWidth = 2; g.beginPath(); g.moveTo(pad, h - 8); g.lineTo(pad + px, h - 8); g.stroke();
+  g.fillStyle = css("--fg2"); g.font = "11px " + css("--font"); g.textAlign = "left"; g.fillText(`${m} m`, pad + px + 6, h - 4);
+}
+function frame() { drawChart("cSpeed", "kmh", css("--accent"), 20, false); drawChart("cPower", "kw", css("--cool"), 10, true); drawTrack("cTrackMini", true); }
+setInterval(frame, 500); window.addEventListener("resize", frame);
+
+// connection chip + staleness
+function chip(state, text) { $("chip").dataset.s = state; $("chipText").textContent = text; }
+const SRC_NAME = { ble: "Bluetooth", cloud: "Online", demo: "Demo" };
+setInterval(() => {
+  if (!source) return;
+  const age = Date.now() - lastRx;
+  if (!lastRx) chip("stale", `${SRC_NAME[source]}: waiting`);
+  else if (age > (source === "cloud" ? 5000 : 2500)) chip("stale", `${SRC_NAME[source]}: no data ${Math.round(age / 1000)} s`);
+  else chip("live", `${SRC_NAME[source]} · live`);
+}, 500);
+
+// ---------- tabs + sheet ----------
+function showTab(t) {
+  if (!$("view-" + t)) t = "drive";
+  for (const b of $("tabs").querySelectorAll("button")) b.dataset.tab === t ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current");
+  for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== "view-" + t;
+  store.set("tab", t); window.scrollTo(0, 0); $("main").scrollTop = 0; frame();
+  if (t === "laps" && window.lapsMapShow) lapsMapShow();
+}
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); };
+// one sheet at a time: the data source sheet or a part sheet
+let sheetTimer, openId = null, lastFocus = null;
+function openSheet(id = "sheet") {
+  clearTimeout(sheetTimer);
+  if (openId && openId !== id) $(openId).hidden = true;
+  if (!openId) lastFocus = document.activeElement;
+  openId = id; $("scrim").hidden = false; $(id).hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add("sheet-open")));
+  $(id).querySelector(".iconbtn").focus({ preventScroll: true });
+}
+function closeSheet() {
+  if (!openId) return;
+  const id = openId; openId = null;
+  document.body.classList.remove("sheet-open");
+  sheetTimer = setTimeout(() => { $(id).hidden = true; $("scrim").hidden = true; }, 300);
+  if (id === "partSheet") selectPart(null);
+  if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+}
+$("chip").onclick = () => openSheet("sheet"); $("srcRow").onclick = () => openSheet("sheet");
+$("sheetClose").onclick = closeSheet; $("partClose").onclick = closeSheet; $("scrim").onclick = closeSheet;
+
+// ---------- kart parts ----------
+const PARTS = { driver: "Driver", battery: "Battery", motor: "Motor", inverter: "Motor controller", brakes: "Brakes", tyres: "Tyres", headlights: "Headlights", rearlights: "Rear lights" };
+let partOpen = null, zoneState = {};
+function selectPart(p) {
+  partOpen = p;
+  for (const b of $("parts").querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.part === p ? "true" : "false");
+  if (window.kart3d) window.kart3d.select(p);
+}
+function openPart(p) {
+  if (!PARTS[p]) return; selectPart(p); renderPart(); openSheet("partSheet"); }
+$("parts").onclick = e => { const b = e.target.closest("button"); if (b) openPart(b.dataset.part); };
+// tapping the kart (3D or the flat view) or the minimap opens the full dashboard (hud.js)
+$("kart").addEventListener("click", e => { const z = e.target.closest("[data-part]"); if (z) openPart(z.dataset.part); });   // flat view
+window.addEventListener("kartpart", e => openPart(e.detail));                                                     // 3D view, split apart
+if (store.get("kartSplitSeen", "")) $("kHint").hidden = true;
+$("cTrackMini").addEventListener("click", () => window.openHud && openHud());
+function partInfo(p, s) {
+  const has = b => !!(s.faults & (1 << b)), mc = b => !!(s.mcFault & (1 << b)), u = (x, d, unit) => fin(x) ? `${fmt(x, d)} ${unit}` : "--";
+  const F = list => list.filter(([on]) => on).map(([, t]) => t);
+  switch (p) {
+    case "battery": return { rows: [["Charge", u(s.soc, 0, "%")], ["Pack voltage", u(s.v, 1, "V")], ["Current", u(s.i, 1, "A")], ["Power", u(s.kw, 1, "kW")],
+      ["Highest cell", u(s.cellHi, 3, "V")], ["Lowest cell", u(s.cellLo, 3, "V")], ["Cell spread", fin(s.cellHi) && fin(s.cellLo) ? `${Math.round((s.cellHi - s.cellLo) * 1000)} mV` : "--"],
+      ["Temperature", u(s.tBatt, 0, "°C")], ["12 V battery", u(s.v12, 2, "V")]],
+      faults: F([[has(0), FAULT_TEXT[0]], [has(4), FAULT_TEXT[4]], [has(5), FAULT_TEXT[5]], [has(8), FAULT_TEXT[8]]]) };
+    case "motor": return { rows: [["Speed", u(s.rpm, 0, "rpm")], ["Road speed", u(s.kmh, 0, "km/h")], ["Temperature", u(s.tMot, 0, "°C")], ["Throttle", u(s.thr, 0, "%")]],
+      faults: F([[mc(3), "Motor overtemperature"], [mc(5), "Hall sensor fault"], [has(6), FAULT_TEXT[6]]]) };
+    case "inverter": return { rows: [["State", fin(s.mcState) ? (MC_STATE[s.mcState] || "State " + s.mcState) : "Not reported yet"], ["Temperature", u(s.tInv, 0, "°C")],
+      ["Coolant", fin(s.coolant) ? u(s.coolant, 0, "°C") : "No sensor"], ["DC current", u(s.i, 1, "A")]],
+      faults: F([[has(1), FAULT_TEXT[1]], [has(3), FAULT_TEXT[3]], [has(7), FAULT_TEXT[7]]]).concat(MC_FAULT.filter((t, b) => b !== 3 && b !== 5 && b !== 10 && mc(b))) };
+    case "brakes": return { rows: [], faults: F([[mc(10), "Brake and throttle pressed together"]]),
+      note: "The kart has no brake pressure or temperature sensor yet, so there is no live brake data. The motor controller still reports brake and throttle pressed together." };
+    case "tyres": return { rows: [["Road speed", u(s.kmh, 0, "km/h")], ["Pitch / roll", fin(s.pitch) ? `${fmt(s.pitch, 0)}° / ${fmt(s.roll, 0)}°` : "--"]], faults: [],
+      note: "No tyre pressure or temperature sensors on the kart. Speed and incline are shown for reference." };
+    case "driver": return { rows: [["Drive mode", fin(s.mode) ? MODES[s.mode] : "--"], ["Speed", u(s.kmh, 0, "km/h")], ["Throttle", u(s.thr, 0, "%")],
+      ["Current lap", lapStart ? mmss(Date.now() - lapStart) : "Not started"], ["Controls", $("pinState") ? $("pinState").textContent : "--"]], faults: [],
+      note: "Tap the kart (when it is not split) for the full driver's dashboard." };
+    case "headlights": return { rows: [["Headlamp setting", fin(s.lamp) ? LAMPS[s.lamp] : "--"]], faults: [],
+      note: "This is the setting the app sent to the kart (Auto, On or Off), not a measured lamp state. Change it with Lamps on the Drive screen." };
+    case "rearlights": return { rows: [["Brake light", "Not reported yet"], ["Regen braking", fin(s.i) && s.i < 0 ? `${fmt(-s.i, 0)} A` : "0 A"],
+      ["Lamp setting", fin(s.lamp) ? LAMPS[s.lamp] : "--"]], faults: [],
+      note: "The kart does not send its rear or brake light state yet. A spare bit in the auxFlags field of the K1 line could carry it." };
+  }
+}
+function renderPart() {
+  const p = partOpen; if (!p) return;
+  const s = last || {}, info = partInfo(p, s), z = zoneState[p] || { sev: "none" };
+  $("partTitle").textContent = PARTS[p];
+  const st = $("partStatus"); st.dataset.sev = z.sev;
+  $("partStatusIco").setAttribute("href", z.sev === "crit" ? "#i-stop" : z.sev === "warn" ? "#i-warn" : "#i-ok");
+  $("partStatusText").textContent = !last ? "No data yet" : z.sev === "crit" ? "Fault" : z.sev === "warn" ? "Needs attention"
+    : z.sev === "ok" ? "Normal" : (p === "brakes" || p === "tyres" || p === "rearlights") ? "No sensor" : "Live";
+  $("partRows").innerHTML = info.rows.map(([k, v]) => `<div class="rowi"><span>${k}</span><span class="num">${v}</span></div>`).join("");
+  $("partRows").hidden = !info.rows.length;
+  $("partFaults").innerHTML = info.faults.map(t => `<li><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg>${t}</li>`).join("");
+  $("partNote").textContent = info.note || ""; $("partNote").hidden = !info.note;
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+for (const id of ["btnBle", "btnCloud", "btnDemo", "btnStop"]) $(id).addEventListener("click", closeSheet);
+
+// ---------- sources ----------
+let stopFn = null, bleRx = null, authed = false;
+function setSource(name, stop) {
+  if (stopFn) stopFn();
+  if (source === "demo" && name !== "demo") { hist = []; track = []; rec = []; }   // never mix demo data into a real session
+  stopFn = stop; source = name; lastRx = 0; authed = false;
+  $("btnStop").hidden = !name; $("btnDemo").setAttribute("aria-pressed", name === "demo");
+  $("srcVal").textContent = name ? SRC_NAME[name] : "None";
+  if (!name) chip("idle", "Not connected");
+  syncControls();
+}
+$("btnStop").onclick = () => setSource(null, null);
+
+// Bluetooth (Web Bluetooth: Chrome/Edge on Android, Windows, macOS, ChromeOS; on iPhone use the Bluefy browser)
+let lineBuf = "";
+$("btnBle").onclick = async () => {
+  if (!navigator.bluetooth) { toast("This browser has no Bluetooth. Use Chrome on Android or a laptop, or Bluefy on iPhone."); return; }
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "Crosskart" }], optionalServices: [NUS] });
+    chip("stale", "Bluetooth: connecting");
+    const srv = await dev.gatt.connect(), svc = await srv.getPrimaryService(NUS);
+    const tx = await svc.getCharacteristic(NUS_TX); bleRx = await svc.getCharacteristic(NUS_RX);
+    const dec = new TextDecoder();
+    const onNote = e => {
+      lineBuf += dec.decode(e.target.value);
+      let n; while ((n = lineBuf.indexOf("\n")) >= 0) { const line = lineBuf.slice(0, n).trim(); lineBuf = lineBuf.slice(n + 1); handleBleLine(line); }
+      if (lineBuf.length > 600) lineBuf = "";
+    };
+    tx.addEventListener("characteristicvaluechanged", onNote);
+    await tx.startNotifications();
+    const onGone = () => { if (source === "ble") { chip("error", "Bluetooth: kart disconnected"); bleRx = null; authed = false; syncControls(); toast("Kart disconnected. Tap the status to reconnect."); } };
+    dev.addEventListener("gattserverdisconnected", onGone);
+    setSource("ble", () => { dev.removeEventListener("gattserverdisconnected", onGone); try { dev.gatt.disconnect(); } catch (e) {} bleRx = null; });
+    wakeLock();
+    const pin = $("pin").value.trim();
+    if (pin) send(`AUTH,${pin}`); else toast("Connected. Enter the control PIN in Settings to use the controls.");
+  } catch (e) { if (e.name !== "NotFoundError") { chip("error", "Bluetooth failed"); toast("Bluetooth: " + e.message); } }
+};
+function handleBleLine(line) {
+  if (line.startsWith("K1,")) { const s = fromBleLine(line); if (s) onSample(s); return; }
+  if (line === "OK,AUTH") { authed = true; syncControls(); toast("Controls unlocked"); return; }
+  if (line === "ERR,PIN") { authed = false; syncControls(); toast("Wrong control PIN"); return; }
+  if (line === "ERR,MOVING") { toast("Stop the kart before changing drive mode"); return; }
+  if (line === "ERR,AUTH") { toast("Enter the control PIN in Settings first"); return; }
+  if (line.startsWith("OK,")) toast("Kart confirmed " + line.slice(3).replace(",", " "));
+}
+async function send(cmd) {
+  if (source === "demo") return demoCmd(cmd);
+  if (!bleRx) return;
+  try { const b = new TextEncoder().encode(cmd + "\n"); await (bleRx.writeValueWithResponse ? bleRx.writeValueWithResponse(b) : bleRx.writeValue(b)); }
+  catch (e) { toast("Send failed: " + e.message); }
+}
+$("pin").addEventListener("change", () => { store.set("pin", $("pin").value.trim()); if (source === "ble" && $("pin").value.trim()) send(`AUTH,${$("pin").value.trim()}`); if (source === "demo") authed = true; syncControls(); });
+$("packAh").addEventListener("change", () => { const v = parseFloat($("packAh").value); store.set("packAh", v > 0 ? String(v) : ""); if (last) render(last); });
+
+// Online: Firebase Realtime Database REST streaming (no SDK, free Spark plan)
+$("btnCloud").onclick = () => {
+  let base = $("fbUrl").value.trim().replace(/\/+$/, "");
+  if (!/^https:\/\/.+/.test(base)) { showTab("settings"); $("fbUrl").focus(); toast("Enter the Firebase database URL first"); return; }
+  store.set("fbUrl", base);
+  let es;
+  try { es = new EventSource(base + "/kart/live.json"); } catch (e) { toast("Could not open the online stream: " + e.message); return; }
+  const take = e => { try { const m = JSON.parse(e.data); if (m && m.path === "/" && m.data) { const s = fromCloud(m.data); if (s) onSample(s); } } catch (err) {} };
+  es.addEventListener("put", take); es.addEventListener("patch", take);
+  es.addEventListener("cancel", () => { chip("error", "Online: access denied"); });
+  es.onerror = () => { if (source === "cloud") chip("error", "Online: reconnecting"); };
+  setSource("cloud", () => es.close());
+  chip("stale", "Online: connecting");
+  wakeLock();
+};
+
+// Demo: a fake kart lapping an oval, so the app can be tried without hardware
+let demo = { mode: 0, lamp: 0 };
+function demoCmd(cmd) {
+  const [c, v] = cmd.split(",");
+  setTimeout(() => {
+    if (c === "MODE") { if (last && last.kmh > 2) return handleBleLine("ERR,MOVING"); demo.mode = +v; handleBleLine("OK,MODE," + MODES[+v]); }
+    if (c === "LAMP") { demo.lamp = +v; handleBleLine("OK,LAMP," + LAMPS[+v]); }
+  }, 150);
+}
+$("btnDemo").onclick = () => {
+  if (source === "demo") return setSource(null, null);
+  const t0 = Date.now(); let soc = 82, tm = 48, ti = 38, tb = 30;
+  const id = setInterval(() => {
+    const t = (Date.now() - t0) / 1000;
+    const stopped = (t % 75) > 62;                    // stops in the pits every lap so the mode can be changed
+    const cap = [40, 80, 125][demo.mode];
+    const kmh = stopped ? 0 : Math.max(0, 32 + 18 * Math.sin(t / 4) + 6 * Math.sin(t / 1.3)) * (0.75 + demo.mode * 0.15);
+    const iA = stopped ? 1.5 : Math.min(cap, Math.max(-5, 8 + 0.9 * kmh + 22 * Math.cos(t / 4)));
+    const v = 336 - iA * 0.08 + soc * 0.1 - 8;
+    soc = Math.max(5, soc - iA * 0.2 / 3600 / 50 * 100);
+    tm += (40 + iA * 0.7 - tm) * 0.002; ti += (30 + iA * 0.35 - ti) * 0.003; tb += (28 + iA * 0.05 - tb) * 0.0005;
+    const ang = t / 75 * 2 * Math.PI;
+    const s = { kmh, rpm: kmh / 3.6 / 0.3 * 10.5 * 60 / (2 * Math.PI), soc, v, i: iA, kw: v * iA / 1000, cellHi: v / 105 + 0.012, cellLo: v / 105 - 0.01,
+      tBatt: tb, tMot: tm, tInv: ti, coolant: ti - 4, v12: 13.6, mcState: stopped ? 3 : 4, mcFault: 0,
+      faults: soc < 20 ? 1 << 5 : 0, lat: 34.0698 + 0.0011 * Math.sin(ang), lon: 72.6444 + 0.0019 * Math.cos(ang), sats: 9, fix: true,
+      pitch: 3 * Math.sin(t / 3), roll: 6 * Math.sin(t / 2.1), auxFlags: 0, mode: demo.mode, lamp: demo.lamp, thr: stopped ? 0 : Math.min(100, iA / cap * 100) };
+    onSample(s);
+  }, 200);
+  setSource("demo", () => clearInterval(id));
+  authed = true; syncControls();
+};
+
+// ---------- controls ----------
+function syncControls() {
+  const live = (source === "ble" && bleRx) || source === "demo";
+  const ok = live && authed;
+  const moving = !!last && ((fin(last.kmh) && last.kmh > 2) || (fin(last.rpm) && Math.abs(last.rpm) > 100));
+  $("pinState").textContent = !live ? "Not connected" : ok ? (source === "demo" ? "Unlocked (demo)" : "Unlocked") : "Locked: check the PIN";
+  $("ctlState").textContent = !live ? "Connect by Bluetooth to use the controls" : !ok ? "Enter the control PIN in Settings"
+    : moving ? "Stop the kart to change mode" : source === "demo" ? "Demo, not a real kart" : "Controls unlocked";
+  for (const [segId, key] of [["segMode", "mode"], ["segLamp", "lamp"]])
+    for (const b of $(segId).querySelectorAll("button")) { b.disabled = !ok || (key === "mode" && moving); b.setAttribute("aria-pressed", last && last[key] === +b.dataset.v ? "true" : "false"); }
+}
+$("segMode").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) send(`MODE,${b.dataset.v}`); };
+$("segLamp").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) send(`LAMP,${b.dataset.v}`); };
+
+// ---------- laps + session ----------
+let lapStart = 0, best = Infinity, lastLapMs = 0;
+const mmss = ms => { const s = ms / 1000; return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`; };
+function lapUi() {
+  $("lapLbl").textContent = lapStart ? `Lap ${lapNo}` : "Lap timer";
+  $("lapSub").textContent = !lapStart ? "Tap the flag at the start line" : lapNo > 1 ? `Last ${mmss(lastLapMs)} · Best ${mmss(best)}` : "Timing first lap";
+}
+function markLap() {
+  const now = Date.now();
+  if (lapStart) { lastLapMs = now - lapStart; best = Math.min(best, lastLapMs); $("lastLap").textContent = mmss(lastLapMs); $("bestLap").textContent = mmss(best); }
+  lapStart = now; lapNo++; $("lapCount").textContent = Math.max(0, lapNo - 1);
+  toast(lapNo === 1 ? "Lap timer started" : `Lap ${lapNo - 1} recorded`); lapUi();
+}
+$("btnLap").onclick = markLap; $("btnLapDrive").onclick = markLap;
+setInterval(() => { if (lapStart) $("lapNow").textContent = mmss(Date.now() - lapStart); }, 100);
+const COLS = ["t", "lap", "kmh", "rpm", "soc", "v", "i", "kw", "cellHi", "cellLo", "tBatt", "tMot", "tInv", "coolant", "v12", "thr", "mcState", "mcFault", "faults", "lat", "lon", "sats", "fix", "pitch", "roll", "mode", "lamp"];
+$("btnCsv").onclick = () => {
+  if (!rec.length) return toast("Nothing recorded yet");
+  const rows = [COLS.join(",")].concat(rec.map(s => COLS.map(k => k === "t" ? new Date(s.t).toISOString() : s[k] ?? "").join(",")));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+  a.download = `crosskart_${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+};
+$("btnClear").onclick = () => {
+  if (rec.length && !confirm(`Clear ${rec.length.toLocaleString("en-US")} recorded samples and lap times? Download the CSV first if you need them.`)) return;
+  rec = []; hist = []; track = []; lapNo = 0; lapStart = 0; best = Infinity; lastLapMs = 0;
+  for (const id of ["lastLap", "bestLap"]) $(id).textContent = "--"; $("lapCount").textContent = "0"; $("lapNow").textContent = "0:00.0";
+  $("recCount").textContent = "0 samples recorded"; lapUi(); frame();
+};
+
+// ---------- install (Android Chrome offers it; iPhone uses Share > Add to Home Screen) ----------
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("installBox").hidden = false; });
+$("btnInstall").onclick = async () => { if (!installEvt) return; installEvt.prompt(); const r = await installEvt.userChoice; if (r.outcome === "accepted") $("installBox").hidden = true; installEvt = null; };
+window.addEventListener("appinstalled", () => { $("installBox").hidden = true; toast("Installed"); });
+
+// ---------- misc ----------
+async function wakeLock() { try { if (navigator.wakeLock) await navigator.wakeLock.request("screen"); } catch (e) {} }
+$("fbUrl").value = store.get("fbUrl", ""); $("pin").value = store.get("pin", ""); $("packAh").value = store.get("packAh", "");
+$("opt3d").checked = store.get("kart3d", "on") !== "off";
+$("opt3d").addEventListener("change", () => { store.set("kart3d", $("opt3d").checked ? "on" : "off"); toast("Close and reopen the app to apply"); });
+$("redArc").style.strokeDasharray = `${(1 - RPM_RED / RPM_MAX) * 100} 100`; $("redArc").style.strokeDashoffset = -RPM_RED / RPM_MAX * 100;
+$("rpmMaxTxt").textContent = RPM_MAX / 1000 + "k";
+try { if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
+showTab(store.get("tab", "drive")); syncControls(); lapUi();
+// opened by double-clicking the file: browsers block the 3D model and offline mode there, so say how to open it properly
+if (location.protocol === "file:") setTimeout(() => toast("3D kart needs a web server: use Live Server on index.html, or the GitHub Pages link"), 800);
+// open with the demo running so the screen shows what the app does
+$("btnDemo").click();
+</script>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="hud.js"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
+<script type="module" src="kart3d.js"></script>
+
+</html>
