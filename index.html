@@ -1120,7 +1120,15 @@ if (wantFull) lockLandscape();                                              // i
 buildDial("speedDial", { min: 0, max: RPM_MAX, major: 2000, minor: 1000, label: v => v / 1000, red: RPM_RED });
 buildDial("socDial", { min: 0, max: 100, major: 20, minor: 10, low: 10 });
 buildDial("kwDial", { min: KWD[0], max: KWD[1], major: 20, minor: 10, zero: 0 });
-try { if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
+// offline support; a new version is fetched on every open (never a stale sw.js), and the page reloads once when it takes over,
+// only in the first 30 s after opening so a live Bluetooth session is never cut by an update
+try {
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    const hadSw = !!navigator.serviceWorker.controller, opened = Date.now(); let reloaded = false;
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => r.update()).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadSw && !reloaded && Date.now() - opened < 30000) { reloaded = true; location.reload(); } });
+  }
+} catch (e) {}
 showTab(store.get("tab", "drive")); syncControls(); lapUi();
 // opened by double-clicking the file: browsers block the 3D model and offline mode there, so say how to open it properly
 if (location.protocol === "file:") setTimeout(() => toast("3D kart needs a web server: use Live Server on index.html, or the GitHub Pages link"), 800);

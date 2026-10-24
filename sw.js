@@ -1,6 +1,6 @@
 // Caches the app so it opens at the track with no internet (Bluetooth mode needs no internet).
 // Map tiles are kept as you view them (up to TILE_MAX), so a track you have opened once still shows offline.
-const CACHE = "crosskart-v18", TILES = "crosskart-tiles-v1", TILE_MAX = 3000;
+const CACHE = "crosskart-v19", TILES = "crosskart-tiles-v1", TILE_MAX = 3000;
 const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "parco-logo.png", "parco-nose.png", "kart3d.js", "hud.js", "hud.css", "model/volta.glb",
   "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css",
   "vendor/three/three.module.min.js", "vendor/three/addons/loaders/GLTFLoader.js", "vendor/three/addons/utils/BufferGeometryUtils.js",
@@ -22,6 +22,7 @@ self.addEventListener("fetch", e => {
   if (FONTS.includes(u.hostname)) return e.respondWith(cacheFirst(e.request, CACHE));
   if (u.hostname === "tile.openstreetmap.org") return e.respondWith(cacheFirst(e.request, TILES, true));
   if (u.origin !== location.origin) return;                                      // Firebase stream goes straight to the network
-  e.respondWith(fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; })
+  // app files: always ask the server (GitHub lets phones reuse files for 10 minutes otherwise); the cache is only for offline
+  e.respondWith(fetch(e.request, { cache: "no-cache" }).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; })
     .catch(() => caches.match(e.request).then(r => r || caches.match("index.html"))));
 });
