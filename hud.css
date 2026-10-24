@@ -2,8 +2,8 @@
    Always dark: it is an instrument cluster. Car colours: charcoal panels, PARCO orange edges, red only for faults.
    Sideways: 3 x 3 grid with the map in the middle. Upright: stacked, map under the speed gauge. */
 .hud {
-  --h-bg: #07080a; --h-in: #121417; --h-in2: #1b1e22; --h-edge: rgba(255,138,31,.6); --h-edge2: rgba(255,138,31,.12);
-  --h-fg: #ffffff; --h-fg2: #a3a7ae; --h-acc: #ff8a1f; --h-ok: #2fbf4a; --h-warn: #ffd60a; --h-crit: #ff453a; --h-c: 18px;
+  --h-bg: #07080a; --h-in: #121417; --h-in2: #1b1e22; --h-edge: rgba(var(--mode-rgb, 255,138,31),.6); --h-edge2: rgba(var(--mode-rgb, 255,138,31),.12);
+  --h-fg: #ffffff; --h-fg2: #a3a7ae; --h-acc: var(--mode, #ff8a1f); --h-ok: #2fbf4a; --h-warn: #ffd60a; --h-crit: #ff453a; --h-c: 18px;
   position: fixed; inset: 0; z-index: 25; color: var(--h-fg); color-scheme: dark; overflow: auto; overscroll-behavior: contain;
   background: radial-gradient(120% 90% at 50% 40%, #15171b 0%, var(--h-bg) 70%);
   padding: max(8px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
@@ -169,3 +169,12 @@ button.hp:focus-visible { outline: none; background: #fff; }
 .ampc { position: absolute; left: 0; right: 0; top: 66%; margin: 0; }
 .ampc .hv { font-size: clamp(20px, min(3.2vw, 7vh), 32px); }
 .h-volt .hv { font-size: clamp(22px, min(3.6vw, 9vh), 40px); }
+
+/* full-screen map: the whole screen, a Back button top left, map buttons bottom right */
+.mapfull { z-index: 30; padding: 0; overflow: hidden; }
+.mapfull #mfMap { position: absolute; inset: 0; background: #0b0c0e; }
+.mfback { position: absolute; z-index: 600; top: calc(10px + env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px));
+  display: inline-flex; align-items: center; gap: 2px; height: 44px; padding: 0 16px 0 8px; border: 1px solid var(--h-edge); border-radius: 999px;
+  background: rgba(10,11,13,.82); color: var(--h-fg); font: 600 16px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; cursor: pointer; }
+.mfback svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.mapfull .mapui.br { bottom: calc(28px + env(safe-area-inset-bottom, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); }

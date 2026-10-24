@@ -1,6 +1,7 @@
 <title>Crosskart Telemetry</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#0b0c0e">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,38 +43,73 @@ button { cursor: pointer; }
 svg.ico { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .glass { background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4); border: 1px solid var(--glass-line); }
 
-/* ---------- shell (upright phone first) ---------- */
-.app { min-height: 100dvh; padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
-.topbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; border-width: 0 0 1px;
-  padding: calc(8px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
-.brand { display: flex; align-items: center; min-height: 32px; }
-.brand img { height: 30px; width: auto; }
+/* ---------- shell ----------
+   Drive is a full-screen 3D stage with a few instruments floating over it, like a racing game's HUD. The other pages scroll under the same
+   small floating bar: menu (top left), clock and date, connection status. Glass only on that floating layer. */
+.app { min-height: 100dvh; }
+.hudbar { position: fixed; z-index: 20; top: 0; left: 0; display: flex; align-items: flex-start; gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 0 0 max(12px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.hudbar > * { pointer-events: auto; }
+/* on the scrolling pages the bar gets a backdrop so text never runs under the clock */
+body:not([data-tab="drive"]) .hudbar { right: 0; padding-bottom: 8px; background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); border-bottom: .5px solid var(--sep); }
+.menuwrap { position: relative; }
+.menubtn { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; color: var(--fg); cursor: pointer; }
+.menubtn .ico { width: 22px; height: 22px; }
+.menu { position: absolute; top: calc(100% + 8px); left: 0; min-width: 224px; padding: 6px; border-radius: 18px; display: grid; gap: 2px;
+  box-shadow: 0 18px 44px var(--shadow); transform-origin: top left; animation: menuin .18s cubic-bezier(.2,.8,.2,1); }
+@keyframes menuin { from { opacity: 0; transform: scale(.94) translateY(-4px); } }
+.menu button { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent;
+  color: var(--fg); font-size: 16px; font-weight: 500; text-align: left; }
+.menu button .ico { color: var(--fg2); }
+.menu button:hover, .menu button:focus-visible { background: var(--fill); outline: none; }
+.menu button[aria-current="page"] { color: var(--accent); background: var(--fill); }
+.menu button[aria-current="page"] .ico { color: var(--accent); }
+.brand { display: flex; align-items: center; height: 44px; }
+.brand img { height: 34px; width: auto; filter: drop-shadow(0 1px 6px rgba(0,0,0,.4)); }
 .wordmark { font-weight: 700; font-size: 16px; letter-spacing: .12em; }
-.status { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px 0 14px; border-radius: 999px;
-  border: 0; background: var(--fill); font-size: 13px; font-weight: 500; white-space: nowrap; max-width: 64vw; }
-.status span:not(.dot) { overflow: hidden; text-overflow: ellipsis; }
-.status .ico { width: 14px; height: 14px; color: var(--fg2); }
+.backbtn { display: inline-flex; align-items: center; gap: 2px; height: 44px; padding: 0 16px 0 8px; border-radius: 999px; color: var(--accent); font-size: 16px; font-weight: 600; cursor: pointer; }
+.backbtn .ico { width: 22px; height: 22px; }
+body[data-tab="drive"] .backbtn { display: none; }
+.hudbar .status { align-self: center; }
+/* time and date, top centre: full screen hides the phone's own status bar */
+.timebox { position: fixed; z-index: 21; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  display: grid; justify-items: center; pointer-events: none; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
+.clock { font-size: 17px; font-weight: 600; line-height: 1.2; }
+.datetxt { font-size: 12px; color: var(--fg2); line-height: 1.3; }
+.status { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 2px; border: 0; background: transparent;
+  color: var(--fg2); font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.status .ico { width: 12px; height: 12px; transform: rotate(-90deg); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg2); flex: none; }
 .status[data-s="live"] .dot { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 30%, transparent); }
 .status[data-s="stale"] .dot { background: var(--warn); }
 .status[data-s="error"] .dot { background: var(--crit); }
-.alert { order: 3; flex: 1 1 100%; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px; border-radius: 12px; font-size: 14px; font-weight: 500; min-width: 0; }
+/* top centre: fault banner and lap timer */
+.topcenter { position: fixed; z-index: 19; top: calc(60px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 8px; width: max-content; max-width: min(560px, calc(100vw - 300px)); pointer-events: none; }
+.topcenter > * { pointer-events: auto; }
+.alert { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 14px; border-radius: 14px; font-size: 14px; font-weight: 500; min-width: 0; max-width: 100%; }
 .alert .tag { font-weight: 700; }
 .alert #alertText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .alert[data-sev="none"], .alert[data-sev="ok"] { display: none; }
-.alert[data-sev="ok"] { color: var(--ok); }
-.alert[data-sev="warn"] { background: color-mix(in srgb, var(--warn) 18%, var(--card)); color: var(--fg); }
+.alert[data-sev="warn"] { background: color-mix(in srgb, var(--warn) 22%, var(--card)); color: var(--fg); }
 .alert[data-sev="warn"] .ico, .alert[data-sev="warn"] .tag { color: var(--warn); }
 .alert[data-sev="crit"] { background: var(--crit); color: #fff; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .78; } }
+.lappill { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 5px 0 14px; border-radius: 999px; }
+.lappill.idle { padding: 0 14px 0 5px; }
+body:not([data-tab="drive"]) .lappill { display: none; }
+.lappill .t { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+.lappill .sub { font-size: 12px; color: var(--fg2); }
+.lappill .pbtn { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--fill); color: var(--accent); }
+.lappill .pbtn .ico { width: 18px; height: 18px; }
+.lappill .pbtn.stop { color: var(--fg2); }
+.lappill .start { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; color: var(--fg); font-size: 14px; font-weight: 600; min-height: 44px; padding: 0; }
+.lappill .start .pbtn { pointer-events: none; }
 
-main { padding: 12px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
-.tabs { position: fixed; z-index: 10; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  display: flex; gap: 2px; padding: 4px; border-radius: 999px; box-shadow: 0 10px 30px var(--shadow); }
-.tabs button { display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 74px; min-height: 54px; padding: 4px 10px; border: 0;
-  border-radius: 999px; background: transparent; color: var(--fg2); font-size: 11px; font-weight: 600; }
-.tabs button .ico { width: 24px; height: 24px; }
-.tabs button[aria-current="page"] { color: var(--accent); background: var(--fill); }
+main { min-height: 100dvh; }
+.view:not(.drive) { max-width: 980px; margin: 0 auto;
+  padding: calc(88px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(28px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 
 /* ---------- cards ---------- */
 .card { background: var(--card); border-radius: var(--r); padding: 14px 16px; min-width: 0; min-height: 0; position: relative; overflow: hidden; }
@@ -82,109 +118,130 @@ main { padding: 12px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, e
 .val small { font-size: 15px; font-weight: 500; color: var(--fg2); margin-left: 3px; letter-spacing: 0; }
 .sub { font-size: 13px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar { position: relative; height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; margin: 8px 0 6px; }
-.bar > i { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 3px; background: var(--accent); transition: width .25s linear, left .25s linear, background-color .4s; }
-.bar > b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--fg3); }
+.bar > i { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 3px; background: var(--accent); transition: width .25s linear; }
 .iconbtn { display: inline-grid; place-items: center; width: 40px; height: 40px; margin: -8px -8px -8px 0; border: 0; border-radius: 50%; background: var(--fill); color: var(--accent); }
 .iconbtn .ico { width: 18px; height: 18px; }
 
-/* ---------- Drive ---------- */
-.drive { display: grid; gap: var(--gap); grid-template-columns: minmax(0,1fr) minmax(0,1fr);
-  grid-template-areas: "stage stage" "power batt" "temps temps" "pack lap" "mode mode"; }
-.stage { grid-area: stage; display: grid; grid-template-rows: auto minmax(0,1fr) auto; grid-template-columns: minmax(0,1fr); justify-items: center; gap: 4px; padding: 12px;
-  min-height: 500px; background: radial-gradient(90% 60% at 50% 72%, color-mix(in srgb, var(--accent) 12%, var(--card)) 0%, var(--card) 70%); }
-.kartwrap { grid-row: 1 / -1; grid-column: 1; position: relative; width: 100%; height: 100%; margin: -12px; width: calc(100% + 24px); height: calc(100% + 24px); }
-.kartwrap .kart { position: absolute; inset: 22% 8% 18%; width: auto; height: auto; max-width: 260px; max-height: 360px; margin: auto; }   /* flat fallback stays kart-sized on big screens */
+/* ---------- Drive: full-screen stage (always dark: it is a studio for the car) ---------- */
+body[data-tab="drive"] { overflow: hidden; color-scheme: dark;
+  --fg: #ffffff; --fg2: #a3a7ae; --fg3: #5d6066; --card: #17191c; --card2: #24272b; --fill: rgba(130,134,142,.2);
+  --glass: rgba(20,22,25,.62); --glass-line: rgba(255,255,255,.09); --accent: var(--mode); --on-accent: #000; --ok: #2fbf4a; --warn: #ffd60a; --crit: #ff453a; --shadow: rgba(0,0,0,.5); }
+.drive { position: fixed; inset: 0; }
+/* drive mode colours the instruments: Eco green, Sport red, Normal stays PARCO orange */
+body { --mode: #ff8a1f; --mode-rgb: 255,138,31; }
+body[data-mode="eco"] { --mode: #2fbf4a; --mode-rgb: 47,191,74; }
+body[data-mode="sport"] { --mode: #ff3b30; --mode-rgb: 255,59,48; }
+.stage::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .6s;
+  background: radial-gradient(90% 60% at 50% 100%, rgba(var(--mode-rgb),.16), transparent 70%), radial-gradient(70% 40% at 50% 0%, rgba(var(--mode-rgb),.07), transparent); }
+body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opacity: 1; }
+.stage { --g: clamp(136px, 31vmin, 232px); position: absolute; inset: 0; background: #0b0c0e; color: #fff; overflow: hidden;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.kartwrap { position: absolute; inset: 0; }
+.kartwrap .kart { position: absolute; inset: 0; margin: auto; width: min(56vw, 280px); height: min(56vh, 400px); }
 .kartwrap.has3d .kart { display: none; }
-.stage3d { position: absolute; inset: 0; touch-action: none; }
+.stage3d { position: absolute; inset: 0; touch-action: none; opacity: 0; transition: opacity .5s ease; }
+.kartwrap.has3d .stage3d { opacity: 1; }
 .stage3d canvas { width: 100% !important; height: 100% !important; display: block; cursor: grab; }
-.stage > .speedo { grid-row: 1; grid-column: 1; z-index: 1; pointer-events: none; }
-.stage > .stagefoot { grid-row: 3; grid-column: 1; z-index: 1; }
-.speedo { position: relative; width: min(100%, 270px); aspect-ratio: 220 / 128; }
-.speedo svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.arc { fill: none; stroke-width: 8; stroke-linecap: round; }
-.arc.trk { stroke: var(--fill); }
-.arc.red { stroke: color-mix(in srgb, var(--crit) 45%, transparent); stroke-linecap: butt; }
-.arc.v { stroke: var(--accent); stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .22s linear, stroke .3s; }
-.arc.v.hot { stroke: var(--crit); }
-.speedo text { fill: var(--fg2); font: 500 11px var(--font); }
-.spd { position: absolute; left: 0; right: 0; bottom: 4px; display: grid; justify-items: center; }
-.spd .big { font-size: clamp(54px, 15vw, 76px); font-weight: 600; letter-spacing: -.045em; line-height: .95; }
-.spd .u { font-size: 13px; font-weight: 500; color: var(--fg2); }
-.klabels { position: absolute; inset: 0; z-index: 2; opacity: 0; pointer-events: none; transition: opacity .2s; }
-.klabel { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 10px; border: 1px solid var(--glass-line);
-  border-radius: 999px; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--fg); font: 600 13px var(--font);
-  white-space: nowrap; cursor: pointer; box-shadow: 0 4px 14px var(--shadow); font-size: 12px; pointer-events: none; }
+/* where the car is framed: the space the instruments leave (the 3D view reads this box) */
+.carsafe { position: absolute; left: 6vw; right: 6vw; top: calc(64px + env(safe-area-inset-top, 0px)); bottom: calc(var(--g) * .42); pointer-events: none; }
+.kartwrap.flying ~ .gauge, .kartwrap.flying ~ .minimap, .kartwrap.flying ~ .khint { opacity: 0; }
+.gauge, .minimap, .khint { transition: opacity .25s ease; }
+
+/* instruments */
+.gauge { position: absolute; z-index: 2; display: flex; align-items: flex-end; gap: calc(var(--g) * .05); pointer-events: none; color: #fff; }
+.gauge::before { content: ""; position: absolute; z-index: -1; inset: -32% -22% -18%; background: radial-gradient(closest-side, rgba(5,6,8,.72), rgba(5,6,8,0)); }
+.speedg { right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+.battg { left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+.dial { position: relative; width: var(--g); aspect-ratio: 1; flex: none; }
+.dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.gin { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; padding-top: 6%; }
+.dial .big { font-size: calc(var(--g) * .21); font-weight: 700; letter-spacing: -.035em; line-height: .92; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
+.dial .u { font-size: calc(var(--g) * .062); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.72); }
+.dial .sm { font-size: calc(var(--g) * .058); color: rgba(255,255,255,.62); margin-top: 2px; }
+.dial .mode { margin-top: calc(var(--g) * .03); font-size: calc(var(--g) * .052); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mode); }
+.dial .trk { fill: none; stroke: rgba(255,255,255,.13); stroke-linecap: round; }
+.dial .val { fill: none; stroke: var(--mode); stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .22s linear, stroke .3s;
+  filter: drop-shadow(0 0 6px rgba(var(--mode-rgb),.55)); }
+.dial .val.regen { stroke: #2fbf4a; filter: drop-shadow(0 0 6px rgba(47,191,74,.5)); }
+.dial .red { fill: none; stroke: rgba(255,69,58,.85); }
+.dial .tick { stroke: rgba(255,255,255,.62); stroke-width: 2; } .dial .tick.minor { stroke: rgba(255,255,255,.3); stroke-width: 1.4; }
+.dial text { fill: rgba(255,255,255,.75); font: 600 13px var(--font); text-anchor: middle; dominant-baseline: middle; }
+.kwdial { width: calc(var(--g) * .46); margin-bottom: calc(var(--g) * .02); }
+.kwdial .big { font-size: calc(var(--g) * .1); }
+.kwdial .u { font-size: calc(var(--g) * .045); }
+.socbar { display: grid; justify-items: center; gap: 4px; width: calc(var(--g) * .16); margin-bottom: calc(var(--g) * .06); }
+.socbar .tube { position: relative; width: calc(var(--g) * .07); height: calc(var(--g) * .62); border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+.socbar .tube > i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; border-radius: 999px; background: #2fbf4a; transition: height .4s, background-color .4s; }
+.socbar .pct { font-size: calc(var(--g) * .075); font-weight: 700; }
+.socbar .pct small { font-size: .6em; color: rgba(255,255,255,.65); }
+.socbar .ico { width: calc(var(--g) * .08); height: calc(var(--g) * .08); color: rgba(255,255,255,.7); }
+.battg .dial { width: calc(var(--g) * .82); }
+.battg .big { font-size: calc(var(--g) * .19); }
+.battg .sm { display: none; }                                     /* the cell range sits beside the dial when there is room */
+.battinfo { display: grid; gap: calc(var(--g) * .02); margin-bottom: calc(var(--g) * .12); font-size: calc(var(--g) * .058); }
+.battinfo div { display: flex; flex-direction: column; }
+.battinfo span { color: rgba(255,255,255,.6); font-size: .86em; }
+.battinfo b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* mini map: round, north-up, edges fading into the stage; the arrow in the middle is the kart */
+.minimap { position: absolute; z-index: 2; top: calc(8px + env(safe-area-inset-top, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
+  width: clamp(170px, 42vmin, 330px); aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 62%, rgba(0,0,0,.5) 82%, transparent 100%); mask-image: radial-gradient(circle closest-side, #000 62%, rgba(0,0,0,.5) 82%, transparent 100%); }
+.minimap .mm { position: absolute; inset: 0; background: transparent; }
+.minimap .leaflet-container { background: transparent; }
+.minimap .leaflet-tile-pane { opacity: .82; }
+.mm-arrow { position: absolute; z-index: 650; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; pointer-events: none; transition: transform .3s linear;
+  filter: drop-shadow(0 0 6px rgba(255,138,31,.9)); }
+.mm-n { position: absolute; z-index: 650; top: 9%; left: 50%; transform: translateX(-50%); font: 700 11px var(--font); color: #ff8a1f; pointer-events: none; text-shadow: 0 1px 4px #000; }
+.mm-note { position: absolute; z-index: 650; inset: 0; display: grid; place-items: center; font-size: 12px; color: rgba(255,255,255,.6); pointer-events: none; }
+
+.khint { position: absolute; z-index: 2; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); margin: 0;
+  font-size: 12px; color: rgba(255,255,255,.62); white-space: nowrap; pointer-events: none; text-shadow: 0 1px 6px #000; }
+.kartwrap:not(.has3d) ~ .khint, .kartwrap.split ~ .khint { display: none; }
+
+/* split view: labels, lines, close button, hold ring */
+.klabels { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.klabel { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 11px; border: 1px solid var(--glass-line);
+  border-radius: 999px; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; font: 600 12px var(--font);
+  white-space: nowrap; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.5); pointer-events: none; }
 .kartwrap.split .klabel { pointer-events: auto; }
-.klabel::after { content: ""; position: absolute; inset: -7px; }                      /* bigger tap area than the chip */
+.klabel::after { content: ""; position: absolute; inset: -7px; }
 .klabel .dot { width: 7px; height: 7px; }
+.klabel[data-sev="none"] > .dot { background: #ff8a1f; }
+.klabel:focus-visible { outline: 2px solid #ff8a1f; }
 .klines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.klines path { fill: none; stroke: var(--fg2); stroke-width: 1; opacity: .7; }
-.klines circle { fill: var(--accent); stroke: var(--card); stroke-width: 1.5; }
-.klabel:focus-visible { outline: 2px solid var(--accent); }
-.kdone { position: absolute; z-index: 3; left: 10px; top: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--glass-line);
-  border-radius: 50%; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--fg2); cursor: pointer; }
+.klines path { fill: none; stroke: rgba(255,255,255,.55); stroke-width: 1; }
+.klines circle { fill: #ff8a1f; stroke: #0b0c0e; stroke-width: 1.5; }
+.kdone { position: absolute; z-index: 4; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(120px + env(safe-area-inset-top, 0px)); display: grid; place-items: center; width: 36px; height: 36px;
+  padding: 0; border: 1px solid var(--glass-line); border-radius: 50%; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #c9cdd3; cursor: pointer; }
 .kdone svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.kdone::after { content: ""; position: absolute; inset: -4px; }                     /* 44 px tap area */
-.khold { position: absolute; z-index: 3; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; pointer-events: none;
-  background: conic-gradient(var(--accent) var(--p, 0%), transparent 0); -webkit-mask: radial-gradient(circle, transparent 22px, #000 23px); mask: radial-gradient(circle, transparent 22px, #000 23px); }
+.kdone::after { content: ""; position: absolute; inset: -4px; }
+.khold { position: absolute; z-index: 4; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#ff8a1f var(--p, 0%), transparent 0); -webkit-mask: radial-gradient(circle, transparent 22px, #000 23px); mask: radial-gradient(circle, transparent 22px, #000 23px); }
 .khold.go { animation: khold .5s linear forwards; }
 @property --p { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
 @keyframes khold { to { --p: 100%; } }
-.stage { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-.kartwrap.flying ~ .speedo, .kartwrap.flying ~ .stagefoot, .kartwrap.flying ~ .minimap { opacity: 0; transition: opacity .2s; }
-.speedo { transition: opacity .3s; }
-.kartwrap.split ~ .speedo { opacity: 0; }
-.khint { margin: 0; font-size: 12px; color: var(--fg2); }
-.kartwrap:not(.has3d) ~ .stagefoot .khint, .kartwrap.split ~ .stagefoot .khint { display: none; }
-.minimap { position: absolute; z-index: 1; top: 12px; right: 12px; width: 76px; height: 76px; border-radius: 14px; background: var(--fill); cursor: pointer; }
-.stagefoot { display: grid; justify-items: center; gap: 8px; width: 100%; }
-.parts { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 2px; }
-.parts::-webkit-scrollbar { display: none; }
-.parts button { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px;
-  background: color-mix(in srgb, var(--card2) 80%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font-size: 13px; font-weight: 600; }
-.parts button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
-.parts .dot, .kv .dot { width: 7px; height: 7px; }
+.kartwrap.split ~ .gauge { opacity: .35; }
+
+/* kart drawing (flat fallback) */
+.kart .shadow { fill: rgba(0,0,0,.5); }
+.kart .chassis { fill: #24272b; stroke: rgba(90,94,102,.5); stroke-width: 1.2; }
+.kart .seat { fill: #17191c; stroke: rgba(90,94,102,.5); }
+.kart .frame { stroke: #5d6066; stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.kart .tyre { fill: #0b0b0c; stroke: #5d6066; stroke-width: 1; }
+.zone { fill: rgba(130,134,142,.2); stroke: #5d6066; stroke-width: 1.2; transition: fill .4s, stroke .4s; }
+.zone[data-sev="ok"] { fill: rgba(255,138,31,.3); stroke: #ff8a1f; }
+.zone[data-sev="warn"] { fill: rgba(255,214,10,.45); stroke: #ffd60a; }
+.zone[data-sev="crit"] { fill: rgba(255,69,58,.6); stroke: #ff453a; animation: pulse 1.2s ease-in-out infinite; }
+.kart .lampz { fill: rgba(130,134,142,.2); stroke: #5d6066; transition: fill .3s; }
+.kart .beam { opacity: 0; transition: opacity .4s; }
+.kart[data-lamp="on"] .lampz { fill: #fff4d6; stroke: #fff4d6; }
+.kart[data-lamp="on"] .beam { opacity: 1; }
+.kart[data-lamp="auto"] .lampz { fill: rgba(255,244,214,.4); }
 [data-sev="ok"] > .dot { background: var(--ok); } [data-sev="warn"] > .dot { background: var(--warn); } [data-sev="crit"] > .dot { background: var(--crit); }
 [data-sev="none"] > .dot, [data-sev=""] > .dot { background: var(--fg3); }
-.klabel[data-sev="none"] > .dot { background: var(--accent); }
-.thr { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg2); width: min(100%, 240px); }
-.thr .bar { flex: 1; margin: 0; }
-
-/* kart drawing */
-.kart .shadow { fill: var(--shadow); }
-.kart .chassis { fill: var(--card2); stroke: var(--sep); stroke-width: 1.2; }
-.kart .seat { fill: var(--card); stroke: var(--sep); }
-.kart .frame { stroke: var(--fg3); stroke-width: 2.4; stroke-linecap: round; fill: none; }
-.kart .tyre { fill: var(--tyre); stroke: var(--fg3); stroke-width: 1; }
-.zone { fill: var(--fill); stroke: var(--fg3); stroke-width: 1.2; transition: fill .4s, stroke .4s; }
-.zone[data-sev="ok"] { fill: color-mix(in srgb, var(--accent) 30%, transparent); stroke: var(--accent); }
-.zone[data-sev="warn"] { fill: color-mix(in srgb, var(--warn) 45%, transparent); stroke: var(--warn); }
-.zone[data-sev="crit"] { fill: color-mix(in srgb, var(--crit) 60%, transparent); stroke: var(--crit); filter: drop-shadow(0 0 5px var(--crit)); animation: pulse 1.2s ease-in-out infinite; }
-.kart .lampz { fill: var(--fill); stroke: var(--fg3); transition: fill .3s; }
-.kart .beam { opacity: 0; transition: opacity .4s; }
-.kart[data-lamp="on"] .lampz { fill: var(--lamp); stroke: var(--lamp); }
-.kart[data-lamp="on"] .beam { opacity: 1; }
-.kart[data-lamp="auto"] .lampz { fill: color-mix(in srgb, var(--lamp) 40%, transparent); }
-
-.power { grid-area: power; } .batt { grid-area: batt; } .temps { grid-area: temps; } .pack { grid-area: pack; } .lap { grid-area: lap; } .modes { grid-area: mode; }
-.batt .row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
-.ring { width: 64px; height: 64px; flex: none; position: relative; }
-.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.ring circle { fill: none; stroke-width: 7; }
-.ring .trk { stroke: var(--fill); }
-.ring .v { stroke: var(--ok); stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .4s, stroke .4s; }
-.ring .in { position: absolute; inset: 0; display: grid; place-items: center; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
-.ring .in small { font-size: 11px; color: var(--fg2); font-weight: 500; }
-.temps .row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; margin-top: 6px; text-align: center; }
-.temps .ring { width: 58px; height: 58px; margin: 0 auto; }
-.temps .ring svg { transform: rotate(135deg); }
-.temps .ring .trk { stroke-dasharray: 75 100; }
-.temps .ring .in { font-size: 15px; }
-.temps .name { font-size: 12px; color: var(--fg2); margin-top: 2px; white-space: nowrap; }
-.temps .state { font-size: 11px; font-weight: 600; min-height: 14px; }
+.kv .dot { width: 7px; height: 7px; }
 .state[data-sev="warn"] { color: var(--warn); } .state[data-sev="crit"] { color: var(--crit); }
-.modes { display: grid; gap: 10px; }
-.modes .r { display: grid; grid-template-columns: 64px minmax(0,1fr); align-items: center; gap: 10px; }
 .hint { font-size: 12px; color: var(--fg2); margin: 0; }
 
 /* segmented control */
@@ -194,6 +251,9 @@ main { padding: 12px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, e
 :root[data-theme="light"] .seg button[aria-pressed="true"] { background: #fff; }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .seg button[aria-pressed="true"] { background: #fff; } }
 .seg button:disabled { opacity: .4; cursor: not-allowed; }
+.segrow { display: grid; gap: 8px; padding: 12px 16px; }
+.segrow .lbl { font-size: 14px; color: var(--fg); }
+.radio .rowi[aria-checked="true"]::after { content: ""; width: 9px; height: 16px; margin-right: 4px; border: solid var(--accent); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) translateY(-3px); }
 
 /* ---------- other views ---------- */
 .view h2 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; margin: 6px 4px 10px; }
@@ -266,75 +326,37 @@ body.sheet-open .sheet { transform: none; }
 .toast { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   padding: 12px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 10px 30px var(--shadow); }
 
-/* ---------- wide: phone sideways, tablet, desktop ----------
-   The car stage takes the middle ~60%; the side cards are narrow. Type and gauges scale with the screen height (vh), so the same layout is
-   compact on a phone held sideways (~360-420 px tall) and roomy on a desktop. The speed readout sits in the stage corner, not above the car. */
+/* ---------- sizes ----------
+   Instruments scale with the screen (vmin); these only adjust the in-between cases. */
+/* phone upright: smaller dials, the power dial and battery details step aside, the car sits between the map and the dials */
+@media (max-aspect-ratio: 1/1) {
+  .stage { --g: clamp(112px, 31vw, 160px); }
+  .kwdial, .battinfo { display: none; }
+  .battg .dial { width: calc(var(--g) * .9); }
+  .battg .sm { display: block; }
+  .minimap { width: clamp(140px, 44vw, 220px); }
+  .carsafe { left: 2vw; right: 2vw; top: calc(clamp(140px, 44vw, 220px) + 4px + env(safe-area-inset-top, 0px)); bottom: calc(var(--g) + 28px); }
+  .khint { bottom: calc(var(--g) + 20px); }
+  .timebox { left: max(12px, env(safe-area-inset-left, 0px)); transform: none; top: calc(62px + env(safe-area-inset-top, 0px)); justify-items: start; }
+  body:not([data-tab="drive"]) .timebox { left: auto; right: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); justify-items: end; }
+  body:not([data-tab="drive"]) .brand { display: none; }
+  .topcenter { max-width: calc(100vw - 32px); top: auto; bottom: calc(var(--g) + 44px + env(safe-area-inset-bottom, 0px)); }
+}
+/* short screens (phone sideways): tighter instruments */
+@media (min-aspect-ratio: 1/1) and (max-height: 520px) {
+  .stage { --g: clamp(108px, 34vh, 172px); }
+  .minimap { width: clamp(130px, 46vh, 230px); }
+  .carsafe { top: calc(40px + env(safe-area-inset-top, 0px)); bottom: calc(var(--g) * .28); left: calc(var(--g) * .55); right: calc(var(--g) * .55); }
+  .khint { display: none; }
+  .view:not(.drive) { padding-top: calc(86px + env(safe-area-inset-top, 0px)); }
+}
+/* wide screens: the side sheet replaces the bottom sheet */
 @media (min-width: 700px) and (min-aspect-ratio: 13/10) {
-  .app { height: 100dvh; padding: 0; display: grid; grid-template-columns: auto minmax(0,1fr); grid-template-rows: auto minmax(0,1fr);
-    grid-template-areas: "tabs top" "tabs main"; }
-  .topbar { grid-area: top; position: static; flex-wrap: nowrap; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
-    padding: max(6px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 0 4px; min-height: 0; }
-  .brand img { height: clamp(26px, 7.5vh, 40px); }
-  .alert { order: 0; flex: 1 1 auto; min-height: 30px; font-size: 13px; }
-  .alert[data-sev="ok"] { display: flex; background: transparent; }
-  .status { max-width: 40vw; min-height: 32px; }
-  .tabs { grid-area: tabs; position: static; transform: none; align-self: center; flex-direction: column; margin: 0 0 0 max(8px, env(safe-area-inset-left, 0px)); border-radius: 28px; }
-  .tabs button { min-width: 60px; min-height: clamp(48px, 13vh, 60px); padding: 4px; border-radius: 22px; }
-  .tabs button .ico { width: 22px; height: 22px; }
-  main { grid-area: main; overflow: auto; padding: 6px max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) 10px; }
-
-  .drive { height: 100%; max-width: 1600px; max-height: 920px; margin: 0 auto; align-content: center; gap: clamp(8px, 1.6vh, 14px);
-    grid-template-columns: minmax(148px, .75fr) minmax(0, 2.5fr) minmax(158px, .8fr);
-    grid-template-rows: repeat(3, minmax(0, 1fr)); grid-template-areas: "power stage batt" "pack stage temps" "lap stage mode"; }
-  .drive .card:not(.stage) { padding: clamp(8px, 2vh, 16px) clamp(10px, 1.2vw, 18px); border-radius: 18px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
-  .drive .lbl { font-size: clamp(11px, 2.6vh, 14px); min-height: 0; }
-  .drive .val { font-size: clamp(18px, 5.2vh, 40px); }
-  .drive .val small { font-size: clamp(11px, 2.8vh, 17px); }
-  .drive .sub { font-size: clamp(11px, 2.6vh, 14px); }
-  .drive .bar { margin: clamp(3px, 1vh, 8px) 0; height: 5px; }
-  .lap .iconbtn { position: absolute; top: 8px; right: 8px; margin: 0; width: 36px; height: 36px; }
-  .lap .iconbtn::after { content: ""; position: absolute; inset: -4px; }            /* 44 px tap area */
-  .batt .row { margin-top: 2px; gap: clamp(8px, 1vw, 14px); }
-  .batt .ring { width: clamp(38px, 12vh, 84px); height: clamp(38px, 12vh, 84px); }
-  .batt .ring .in { font-size: clamp(11px, 3vh, 20px); }
-  .batt .val { font-size: clamp(16px, 4.4vh, 34px) !important; }
-  .temps .row { margin-top: 2px; gap: 4px; }
-  .temps .ring { width: clamp(32px, 10vh, 70px); height: clamp(32px, 10vh, 70px); }
-  .temps .ring .in { font-size: clamp(10px, 2.7vh, 17px); }
-  .temps .name { font-size: 11px; margin-top: 0; }
-  .temps .state:empty { display: none; }
-  .modes { gap: clamp(4px, 1.2vh, 10px); }
-  .modes .r { grid-template-columns: 1fr; gap: 4px; }
-  .modes .r .lbl { display: none; }
-  .seg button { min-height: clamp(28px, 8vh, 40px); font-size: clamp(12px, 3vh, 15px); }
-
-  /* stage: car fills it; speed in the top-left corner, map top-right, part buttons along the bottom */
-  .stage { display: block; position: relative; padding: 0; min-height: 0; }
-  .kartwrap { position: absolute; inset: 0; margin: 0; width: auto; height: auto; }
-  .stage > .speedo { position: absolute; z-index: 1; left: clamp(8px, 1.4vw, 18px); top: clamp(6px, 1.6vh, 14px); width: clamp(120px, 30vh, 250px); }
-  .spd .big { font-size: clamp(30px, 10vh, 72px); }
-  .spd .u { font-size: clamp(10px, 2.4vh, 13px); }
-  .speedo text { font-size: 10px; }
-  .minimap { width: clamp(52px, 14vh, 96px); height: clamp(52px, 14vh, 96px); top: clamp(6px, 1.6vh, 14px); right: clamp(8px, 1.4vw, 18px); }
-  .stage > .stagefoot { position: absolute; z-index: 1; left: 8px; right: 8px; bottom: clamp(6px, 1.4vh, 12px); gap: 4px; }
-  .parts > :first-child { margin-left: auto; } .parts > :last-child { margin-right: auto; }   /* centred, but still scrolls from the first chip */
-  .parts button { min-height: clamp(28px, 7.5vh, 36px); padding: 0 10px; font-size: clamp(11px, 2.8vh, 13px); }
-  .klabel { font-size: 11px; min-height: 28px; }
   .toast { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
   .sheet { bottom: auto; top: 50%; border-radius: 22px; border-bottom: 1px solid var(--glass-line); transform: translateY(-40%) scale(.96); opacity: 0;
     transition: transform .25s, opacity .25s; padding-bottom: 18px; max-height: 92dvh; overflow: auto; }
   body.sheet-open .sheet { transform: translateY(-50%); opacity: 1; }
   .grabber { display: none; }
-}
-/* short screens (phone sideways): drop the extras so the car and readouts get the room */
-@media (min-width: 700px) and (min-aspect-ratio: 13/10) and (max-height: 520px) {
-  .khint, .thr, #ctlState { display: none !important; }
-  .drive .card:not(.stage) .bar + .sub { margin-top: 0; }
-  .alert[data-sev="ok"] .tag, .alert[data-sev="ok"] #alertText { font-size: 12px; }
-}
-/* big screens: a touch more air between the cockpit and the window edges */
-@media (min-width: 1100px) and (min-height: 700px) {
-  main { padding: 10px 24px 20px 16px; }
 }
 
 /* accessibility states */
@@ -357,37 +379,44 @@ body.sheet-open .sheet { transform: none; }
   <symbol id="i-bt" viewBox="0 0 24 24"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></symbol>
   <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 11a3.5 3.5 0 0 0 1 7z"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3"/><path d="M7 12h5"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 </svg>
 
-<div class="app">
-  <header class="topbar glass">
-    <div class="brand">
-      <img id="logo" src="parco-logo.png" alt="PARCO" hidden>
-      <span class="wordmark" id="wordmark" aria-label="PARCO, title sponsor">PARCO</span>
+<div class="app" id="app">
+  <!-- floating bar: menu, clock and date (the phone's own status bar is hidden in full screen), connection status -->
+  <header class="hudbar">
+    <div class="menuwrap">
+      <button class="menubtn glass" id="menuBtn" type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">
+        <svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg></button>
+      <nav class="menu glass" id="menu" role="menu" aria-label="Pages" hidden>
+        <button type="button" role="menuitem" data-tab="drive"><svg class="ico" aria-hidden="true"><use href="#i-drive"/></svg>Drive</button>
+        <button type="button" role="menuitem" data-tab="systems"><svg class="ico" aria-hidden="true"><use href="#i-systems"/></svg>Systems</button>
+        <button type="button" role="menuitem" data-tab="laps"><svg class="ico" aria-hidden="true"><use href="#i-laps"/></svg>Laps</button>
+        <button type="button" role="menuitem" data-tab="settings"><svg class="ico" aria-hidden="true"><use href="#i-settings"/></svg>Settings</button>
+      </nav>
     </div>
-    <div class="alert" id="alert" data-sev="none" role="status" aria-live="polite">
-      <svg class="ico"><use id="alertIco" href="#i-ok"/></svg><span class="tag" id="alertTag">Status</span><span id="alertText">Connect to the kart, watch online, or try the demo.</span>
-    </div>
+    <button class="backbtn glass" id="backBtn" type="button" aria-label="Back to Drive"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Drive</button>
+    <div class="brand"><img id="logo" src="parco-logo.png" alt="PARCO" hidden><span class="wordmark" id="wordmark" aria-label="PARCO, title sponsor">PARCO</span></div>
     <button class="status" id="chip" data-s="idle" type="button" aria-haspopup="dialog" aria-controls="sheet">
-      <span class="dot" aria-hidden="true"></span><span id="chipText">Not connected</span><svg class="ico" aria-hidden="true"><use href="#i-chev"/></svg>
-    </button>
+      <span class="dot" aria-hidden="true"></span><span id="chipText">Not connected</span><svg class="ico" aria-hidden="true"><use href="#i-chev"/></svg></button>
   </header>
-
-  <nav class="tabs glass" id="tabs" aria-label="Sections">
-    <button type="button" data-tab="drive"><svg class="ico" aria-hidden="true"><use href="#i-drive"/></svg>Drive</button>
-    <button type="button" data-tab="systems"><svg class="ico" aria-hidden="true"><use href="#i-systems"/></svg>Systems</button>
-    <button type="button" data-tab="laps"><svg class="ico" aria-hidden="true"><use href="#i-laps"/></svg>Laps</button>
-    <button type="button" data-tab="settings"><svg class="ico" aria-hidden="true"><use href="#i-settings"/></svg>Settings</button>
-  </nav>
+  <div class="timebox"><span class="clock num" id="clock">--:--</span><span class="datetxt" id="dateTxt"></span></div>
+  <div class="topcenter">
+    <div class="alert glass" id="alert" data-sev="none" role="status" aria-live="polite">
+      <svg class="ico"><use id="alertIco" href="#i-ok"/></svg><span class="tag" id="alertTag">Status</span><span id="alertText"></span>
+    </div>
+  </div>
 
   <main id="main">
-    <!-- Drive -->
+    <!-- Drive: the car fills the screen, instruments float in the corners -->
     <section class="view drive" id="view-drive" aria-label="Drive">
-      <div class="card stage">
+      <div class="stage">
         <div class="kartwrap">
           <svg class="kart" id="kart" viewBox="0 0 160 230" role="img" aria-label="Kart, top view" data-lamp="auto">
-            <defs><linearGradient id="beamG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="var(--lamp)" stop-opacity=".55"/><stop offset="1" stop-color="var(--lamp)" stop-opacity="0"/></linearGradient></defs>
+            <defs><linearGradient id="beamG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#fff4d6" stop-opacity=".55"/><stop offset="1" stop-color="#fff4d6" stop-opacity="0"/></linearGradient></defs>
             <path class="beam" d="M60 22 L40 -24 L76 -24 L68 22Z M92 22 L84 -24 L120 -24 L100 22Z" fill="url(#beamG)"/>
             <ellipse class="shadow" cx="80" cy="120" rx="76" ry="104" opacity=".35"/>
             <path class="frame" d="M44 56 H116 M42 178 H118"/>
@@ -395,71 +424,37 @@ body.sheet-open .sheet { transform: none; }
             <rect class="tyre" x="6" y="152" width="30" height="52" rx="8"/><rect class="tyre" x="124" y="152" width="30" height="52" rx="8"/></g>
             <path class="chassis" d="M62 14 Q80 8 98 14 L108 52 L116 120 L118 186 Q118 214 80 216 Q42 214 42 186 L44 120 L52 52 Z"/>
             <g data-part="headlights"><rect class="lampz" x="62" y="16" width="10" height="6" rx="2"/><rect class="lampz" x="88" y="16" width="10" height="6" rx="2"/></g>
-            <rect class="zone" id="z-battery" data-part="battery" x="56" y="44" width="48" height="40" rx="6"/>
             <rect class="seat" x="52" y="92" width="25" height="40" rx="8"/><rect class="seat" x="83" y="92" width="25" height="40" rx="8"/>
-            <path class="frame" d="M48 138 H112"/>
-            <rect class="zone" id="z-inverter" data-part="inverter" x="52" y="148" width="26" height="22" rx="4"/>
-            <rect class="zone" id="z-motor" data-part="motor" x="84" y="146" width="26" height="40" rx="12"/>
+            <rect class="zone" id="z-battery" data-part="battery" x="40" y="138" width="80" height="14" rx="4"/>
+            <rect class="zone" data-part="battery" x="74" y="70" width="12" height="70" rx="3"/>
+            <rect class="zone" id="z-inverter" data-part="inverter" x="60" y="154" width="40" height="8" rx="3"/>
+            <rect class="zone" id="z-motor" data-part="motor" x="64" y="166" width="32" height="22" rx="10"/>
+            <rect class="zone" id="z-cooling" data-part="cooling" x="58" y="192" width="44" height="10" rx="3"/>
           </svg>
           <div class="stage3d" id="stage3d" aria-hidden="true"></div>
         </div>
-        <div class="speedo">
-          <svg viewBox="0 0 220 128" aria-hidden="true">
-            <path class="arc trk" d="M20 112 A90 90 0 0 1 200 112" pathLength="100"/>
-            <path class="arc red" d="M20 112 A90 90 0 0 1 200 112" pathLength="100" id="redArc"/>
-            <path class="arc v" d="M20 112 A90 90 0 0 1 200 112" pathLength="100" id="rpmArc"/>
-            <text x="20" y="127" text-anchor="middle">0</text><text x="200" y="127" text-anchor="middle" id="rpmMaxTxt">7k</text>
-          </svg>
-          <div class="spd"><span class="big num" id="kmh">--</span><span class="u num" id="rpm">km/h · -- rpm</span></div>
+        <div class="carsafe" id="carSafe" aria-hidden="true"></div>
+
+        <div class="minimap" id="miniMap" role="button" tabindex="0" aria-label="Map. Opens the full-screen map">
+          <div class="mm" id="miniMapCanvas"></div>
+          <span class="mm-n" aria-hidden="true">N</span>
+          <svg class="mm-arrow" id="mmArrow" viewBox="-14 -14 28 28" aria-hidden="true"><path d="M0 -12 L9 10 L0 5 L-9 10 Z" fill="#ff8a1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <span class="mm-note" id="mmNote">No GPS yet</span>
         </div>
-        <canvas class="minimap" id="cTrackMini" role="button" aria-label="Open the dashboard with the live map"></canvas>
-        <div class="stagefoot">
-          <p class="khint" id="kHint">Tap the kart for the driver's view · hold it to see its parts</p>
-          <div class="parts" id="parts" role="group" aria-label="Kart parts, tap for live data">
-            <button type="button" data-part="driver" data-sev="none"><span class="dot"></span>Driver</button>
-            <button type="button" data-part="battery" data-sev="none"><span class="dot"></span>Battery</button>
-            <button type="button" data-part="inverter" data-sev="none"><span class="dot"></span>Controller</button>
-            <button type="button" data-part="motor" data-sev="none"><span class="dot"></span>Motor</button>
-            <button type="button" data-part="tyres" data-sev="none"><span class="dot"></span>Tyres</button>
-            <button type="button" data-part="brakes" data-sev="none"><span class="dot"></span>Brakes</button>
-            <button type="button" data-part="headlights" data-sev="none"><span class="dot"></span>Headlights</button>
-            <button type="button" data-part="rearlights" data-sev="none"><span class="dot"></span>Rear lights</button>
+
+        <div class="gauge speedg" role="group" aria-label="Speed, power and charge">
+          <div class="dial kwdial" id="kwDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
+            <div class="gin"><span class="big num" id="kw">--</span><span class="u">kW</span></div></div>
+          <div class="dial" id="speedDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
+            <div class="gin"><span class="big num" id="kmh">--</span><span class="u">km/h</span><span class="sm num" id="rpm">-- rpm</span><span class="mode" id="modeTxt"></span></div></div>
+          <div class="socbar" aria-label="Battery charge">
+            <span class="pct num"><span id="soc">--</span><small>%</small></span>
+            <div class="tube"><i id="socFill"></i></div>
+            <svg class="ico" aria-hidden="true"><use href="#i-batt"/></svg>
           </div>
-          <div class="thr"><span>Throttle</span><div class="bar"><i id="thrBar"></i></div><span class="num" id="thrTxt">--</span></div>
         </div>
-      </div>
 
-      <div class="card power"><div class="lbl">Power</div>
-        <div class="val num"><span id="kw">--</span><small>kW</small></div>
-        <div class="bar"><i id="kwBar"></i><b id="kwZero"></b></div>
-        <div class="sub num" id="amps">-- A</div></div>
-
-      <div class="card pack"><div class="lbl">Pack</div>
-        <div class="val num"><span id="vpack">--</span><small>V</small></div>
-        <div class="bar"><i id="vBar"></i></div>
-        <div class="sub num" id="cells">Cells --</div></div>
-
-      <div class="card batt"><div class="lbl">Battery</div>
-        <div class="row">
-          <div class="ring"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="trk" cx="32" cy="32" r="27" pathLength="100"/><circle class="v" id="socRing" cx="32" cy="32" r="27" pathLength="100"/></svg>
-            <div class="in num"><span><span id="soc">--</span><small>%</small></span></div></div>
-          <div style="min-width:0"><div class="val num" style="font-size:22px"><span id="range">--</span><small>km</small></div><div class="sub" id="rangeSub">range estimate</div></div>
-        </div></div>
-
-      <div class="card temps"><div class="lbl">Temperatures</div>
-        <div class="row" id="tempRow"></div></div>
-
-      <div class="card lap"><div class="lbl"><span id="lapLbl">Lap timer</span>
-        <button class="iconbtn" type="button" id="btnLapDrive" aria-label="Mark lap"><svg class="ico"><use href="#i-flag"/></svg></button></div>
-        <div class="val num" id="lapNow">0:00.0</div>
-        <div class="sub num" id="lapSub">Tap the flag at the start line</div></div>
-
-      <div class="card modes">
-        <div class="r"><div class="lbl">Mode</div>
-          <div class="seg" id="segMode" role="group" aria-label="Drive mode"><button type="button" data-v="0">Eco</button><button type="button" data-v="1">Normal</button><button type="button" data-v="2">Sport</button></div></div>
-        <div class="r"><div class="lbl">Lamps</div>
-          <div class="seg" id="segLamp" role="group" aria-label="Headlamps"><button type="button" data-v="0">Auto</button><button type="button" data-v="1">On</button><button type="button" data-v="2">Off</button></div></div>
-        <p class="hint" id="ctlState">Connect by Bluetooth to use</p>
+        <p class="khint" id="kHint">Tap the kart for the driver's view · hold it to see its parts</p>
       </div>
     </section>
 
@@ -500,7 +495,14 @@ body.sheet-open .sheet { transform: none; }
       <h2>Settings</h2>
       <div class="group"><button class="rowi" type="button" id="srcRow"><span>Data source</span><span class="muted" id="srcVal">None</span><svg class="ico chev" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
       <h3>Kart controls</h3>
-      <div class="group"><label class="rowi" for="pin"><span>Control PIN</span><input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="Set in kart firmware" autocomplete="off"></label>
+      <div class="group">
+        <div class="segrow"><div class="lbl">Drive mode</div>
+          <div class="seg" id="segMode" role="group" aria-label="Drive mode"><button type="button" data-v="0">Eco</button><button type="button" data-v="1">Normal</button><button type="button" data-v="2">Sport</button></div></div>
+        <div class="segrow"><div class="lbl">Headlamps</div>
+          <div class="seg" id="segLamp" role="group" aria-label="Headlamps"><button type="button" data-v="0">Auto</button><button type="button" data-v="1">On</button><button type="button" data-v="2">Off</button></div></div>
+      </div>
+      <p class="note" id="ctlState">Connect by Bluetooth to use the controls</p>
+      <div class="group" style="margin-top:10px"><label class="rowi" for="pin"><span>Control PIN</span><input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="Set in kart firmware" autocomplete="off"></label>
         <div class="rowi"><span>Controls</span><span class="muted" id="pinState">Not connected</span></div></div>
       <p class="note">Drive mode only lowers the battery current limit the motor controller already obeys, and the kart accepts a change only while stopped. Eco is the start-up mode. Throttle, contactors and safety functions are never controlled from the app.</p>
       <h3>Online view</h3>
@@ -508,15 +510,21 @@ body.sheet-open .sheet { transform: none; }
       <h3>Battery</h3>
       <div class="group"><label class="rowi" for="packAh"><span>Pack capacity (Ah)</span><input id="packAh" type="number" inputmode="decimal" min="1" max="500" step="1" placeholder="40"></label></div>
       <p class="note">Used only for the range estimate, with the 336 V nominal pack voltage and your average Wh/km over the last two minutes.</p>
-      <h3>Display</h3>
-      <div class="group"><label class="rowi" for="opt3d"><span>3D kart</span><input class="switch" id="opt3d" type="checkbox" role="switch" checked></label></div>
-      <p class="note">Turn off on a slow phone to show a flat top view instead. Takes effect when the app reopens.</p>
+      <h3>Graphics</h3>
+      <div class="group radio" id="gfxGroup" role="radiogroup" aria-label="Graphics quality">
+        <button class="rowi" type="button" role="radio" data-v="auto"><span>Automatic</span><span class="muted" id="gfxAutoNow"></span></button>
+        <button class="rowi" type="button" role="radio" data-v="high"><span>High</span><span class="muted">Best looking</span></button>
+        <button class="rowi" type="button" role="radio" data-v="balanced"><span>Balanced</span><span class="muted">Lighter on the phone</span></button>
+        <button class="rowi" type="button" role="radio" data-v="smooth"><span>Smooth</span><span class="muted">For older phones</span></button>
+        <button class="rowi" type="button" role="radio" data-v="off"><span>Off</span><span class="muted">Flat top view</span></button>
+      </div>
+      <p class="note">Automatic starts at High on capable phones and steps down by itself if frames get slow. Changing this reloads the app.</p>
       <div id="installBox" hidden>
         <h3>App</h3>
         <div class="group"><button class="rowi" type="button" id="btnInstall"><span>Install on This Phone</span><svg class="ico chev" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
       </div>
       <h3>About</h3>
-      <div class="group"><div class="rowi"><span>GIKI Electric Crosskart</span><span class="muted">Telemetry v2</span></div><div class="rowi"><span>Title sponsor</span><span class="muted">PARCO</span></div></div>
+      <div class="group"><div class="rowi"><span>GIKI Electric Crosskart</span><span class="muted">Telemetry v2</span></div><div class="rowi"><span>Title sponsor</span><span class="muted">PARCO</span></div><div class="rowi"><span>Map data</span><span class="muted">© OpenStreetMap contributors</span></div></div>
     </section>
   </main>
 </div>
@@ -566,7 +574,8 @@ const clamp01 = x => Math.max(0, Math.min(1, x));
 let toastTimer;
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3000); }
 
-$("logo").addEventListener("load", () => { $("logo").hidden = false; $("wordmark").hidden = true; });
+const showLogo = () => { $("logo").hidden = false; $("wordmark").hidden = true; };
+if ($("logo").complete && $("logo").naturalWidth) showLogo(); else $("logo").addEventListener("load", showLogo);   // may already be loaded from cache
 $("logo").addEventListener("error", () => { $("logo").hidden = true; });
 
 // ---------- tiles (Systems) ----------
@@ -593,10 +602,29 @@ function setTile(k, text, unit, s, word) {
 
 // temperature rings (Drive)
 const TEMPS = [["tMot", "Motor", 160], ["tInv", "Inverter", 100], ["tBatt", "Battery", 65]];
-$("tempRow").innerHTML = TEMPS.map(([k, l]) => `<div><div class="ring"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="trk" cx="32" cy="32" r="27" pathLength="100"/><circle class="v" id="r_${k}" cx="32" cy="32" r="27" pathLength="100"/></svg>
-  <div class="in num"><span id="d_${k}">--</span></div></div><div class="name">${l}</div><div class="state" id="ds_${k}"></div></div>`).join("");
-const sevColor = s => css(s === "crit" ? "--crit" : s === "warn" ? "--warn" : "--ok");
-function setRing(id, frac, span, color) { const el = $(id); el.style.strokeDashoffset = 100 - span * clamp01(frac); if (color) el.style.stroke = color; }
+
+// ---------- instruments (Drive): 270-degree dials drawn in SVG ----------
+const ARC0 = 225, SWEEP = 270, KWD = [-20, 80];   // KWD: power dial range, kW (regen to drive)
+
+function arcPath(f0, f1, r = 84) {
+  const p = f => { const a = (ARC0 - SWEEP * f) * Math.PI / 180; return [100 + r * Math.cos(a), 100 - r * Math.sin(a)]; };
+  const [x0, y0] = p(f0), [x1, y1] = p(f1), big = Math.abs(f1 - f0) * SWEEP > 180 ? 1 : 0, cw = f1 > f0 ? 1 : 0;
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 ${big} ${cw} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+function buildDial(id, { min, max, major, minor, label = v => v, red, zero, ends }) {
+  const f = v => (v - min) / (max - min);
+  let h = `<path class="trk" d="${arcPath(0, 1)}" stroke-width="9"/>`;
+  if (red != null) h += `<path class="red" d="${arcPath(f(red), 1)}" stroke-width="9"/>`;
+  for (let v = min; v <= max + 1e-6; v += minor) {
+    const a = (ARC0 - SWEEP * f(v)) * Math.PI / 180, mj = Math.abs(((v - min) / major) - Math.round((v - min) / major)) < 1e-6, r0 = 74, r1 = mj ? 64 : 69;
+    h += `<line class="tick${mj ? "" : " minor"}" x1="${(100 + r0 * Math.cos(a)).toFixed(1)}" y1="${(100 - r0 * Math.sin(a)).toFixed(1)}" x2="${(100 + r1 * Math.cos(a)).toFixed(1)}" y2="${(100 - r1 * Math.sin(a)).toFixed(1)}"/>`;
+    if (mj && (!ends || v === min || v + major > max + 1e-6)) h += `<text x="${(100 + 52 * Math.cos(a)).toFixed(1)}" y="${(100 - 52 * Math.sin(a)).toFixed(1)}">${label(v)}</text>`;
+  }
+  if (zero != null) h += `<path class="val" id="${id}V" d="${arcPath(f(zero), 1)}" pathLength="100" stroke-width="9"/><path class="val regen" id="${id}R" d="${arcPath(f(zero), 0)}" pathLength="100" stroke-width="9"/>`;
+  else h += `<path class="val" id="${id}V" d="${arcPath(0, 1)}" pathLength="100" stroke-width="9"/>`;
+  $(id).querySelector("svg").innerHTML = h;
+}
+const setArc = (id, frac) => { const el = $(id); if (el) el.style.strokeDashoffset = 100 - 100 * clamp01(frac); };
 
 // ---------- data model ----------
 // Every source is turned into one sample: { t, kmh, rpm, soc, v, i, kw, cellHi, cellLo, tBatt, tMot, tInv, coolant, v12, mcState, mcFault, faults, lat, lon, sats, fix, pitch, roll, auxFlags, mode, lamp, thr }
@@ -625,10 +653,14 @@ function fromCloud(o) {
 
 const HIST_MS = 120000;
 let hist = [], track = [], rec = [], lastRx = 0, last = null, source = null, lapNo = 0;
+let lastFix = null, lapTrack = [];                                          // the map line is drawn only while a lap is being timed
 function onSample(s) {
   s.t = Date.now(); lastRx = s.t; last = s; s.lap = lapNo;
   hist.push(s); while (hist.length && hist[0].t < s.t - HIST_MS) hist.shift();
-  if (s.fix && fin(s.lat) && fin(s.lon) && (s.lat !== 0 || s.lon !== 0)) { track.push([s.lat, s.lon]); if (track.length > 4000) track.shift(); }
+  if (s.fix && fin(s.lat) && fin(s.lon) && (s.lat !== 0 || s.lon !== 0)) {
+    lastFix = [s.lat, s.lon]; track.push(lastFix); if (track.length > 4000) track.shift();
+    if (lapStart) { lapTrack.push(lastFix); if (lapTrack.length > 6000) lapTrack.shift(); }
+  }
   if (rec.length < 60000) rec.push(s);
   render(s);
 }
@@ -646,44 +678,26 @@ function whPerKm() {
 
 // ---------- rendering ----------
 function worst(...l) { return l.includes("crit") ? "crit" : l.includes("warn") ? "warn" : l.includes("ok") ? "ok" : ""; }
+let rangeKm = null;
 function render(s) {
-  // speed + rpm arc
+  // speed dial: rpm arc, speed, mode
   $("kmh").textContent = fmt(s.kmh, 0);
-  $("rpm").textContent = `km/h · ${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
-  const ra = $("rpmArc"); ra.style.strokeDashoffset = 100 - 100 * clamp01(Math.abs(s.rpm || 0) / RPM_MAX); ra.classList.toggle("hot", Math.abs(s.rpm || 0) >= RPM_RED);
-
-  // power, centre-zero bar: drive to the right, regen to the left
+  $("rpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
+  setArc("speedDialV", Math.abs(s.rpm || 0) / RPM_MAX); $("speedDialV").style.stroke = Math.abs(s.rpm || 0) >= RPM_RED ? "#ff453a" : "";
+  const md = s.mode === 0 ? "eco" : s.mode === 2 ? "sport" : "";                 // Normal shows nothing
+  $("modeTxt").textContent = md ? `${MODES[s.mode]} mode` : "";
+  if (document.body.dataset.mode !== md) document.body.dataset.mode = md;
+  // power dial: drive (orange) from zero clockwise, regen (green) from zero anticlockwise
   $("kw").textContent = fmt(s.kw, 1);
-  const z = -KW_MIN / (KW_MAX - KW_MIN) * 100, kb = $("kwBar"), kw = fin(s.kw) ? Math.max(KW_MIN, Math.min(KW_MAX, s.kw)) : 0, w = Math.abs(kw) / (KW_MAX - KW_MIN) * 100;
-  kb.style.left = (kw >= 0 ? z : z - w) + "%"; kb.style.width = w + "%"; kb.style.backgroundColor = kw < 0 ? css("--ok") : css("--accent");
-  $("amps").textContent = `${fmt(s.i, 1)} A${fin(s.kw) && s.kw < 0 ? " · regen" : ""}`;
-
-  // pack
-  $("vpack").textContent = fmt(s.v, 1);
-  $("vBar").style.width = fin(s.v) ? clamp01((s.v - V_MIN) / (V_MAX - V_MIN)) * 100 + "%" : "0";
-  const sc = worst(sev("cellLo", s.cellLo), sev("cellHi", s.cellHi));
-  $("vBar").style.backgroundColor = sc === "crit" ? css("--crit") : sc === "warn" ? css("--warn") : css("--accent");
-  $("cells").textContent = fin(s.cellLo) ? `Cells ${fmt(s.cellLo, 2)}–${fmt(s.cellHi, 2)} V` : "Cells --";
-
-  // battery + range
+  const kw = fin(s.kw) ? s.kw : 0;
+  setArc("kwDialV", kw > 0 ? kw / KWD[1] : 0); setArc("kwDialR", kw < 0 ? kw / KWD[0] : 0);
+  // charge bar
   $("soc").textContent = fmt(s.soc, 0);
-  setRing("socRing", (s.soc || 0) / 100, 100, !fin(s.soc) ? css("--fg3") : s.soc < 10 ? css("--crit") : s.soc < 20 ? css("--warn") : css("--ok"));
+  const sf = $("socFill"); sf.style.height = fin(s.soc) ? clamp01(s.soc / 100) * 100 + "%" : "0";
+  sf.style.backgroundColor = !fin(s.soc) ? "" : s.soc < 10 ? "#ff453a" : s.soc < 20 ? "#ffd60a" : "#2fbf4a";
+  // range estimate from charge, pack size and recent consumption (the dashboard shows it)
   const ah = parseFloat(store.get("packAh", "")) || DEFAULT_AH, wk = whPerKm();
-  const rng = fin(s.soc) ? s.soc / 100 * NOMINAL_V * ah / (wk || DEFAULT_WH_KM) : null;
-  $("range").textContent = fin(rng) ? fmt(rng, rng < 10 ? 1 : 0) : "--";
-  $("rangeSub").textContent = wk ? `est. at ${fmt(wk, 0)} Wh/km` : "estimate";
-
-  // temperature rings
-  for (const [k, , max] of TEMPS) {
-    const sv = sev(k, s[k]);
-    $("d_" + k).textContent = fin(s[k]) ? fmt(s[k], 0) + "°" : "--";
-    setRing("r_" + k, (s[k] || 0) / max, 75, fin(s[k]) ? sevColor(sv) : css("--fg3"));
-    const st = $("ds_" + k); st.dataset.sev = sv; st.textContent = sevWord(k, sv);
-  }
-
-  // throttle, mode, lamps
-  $("thrBar").style.width = fin(s.thr) ? clamp01(s.thr / 100) * 100 + "%" : "0";
-  $("thrTxt").textContent = fin(s.thr) ? fmt(s.thr, 0) + "%" : "--";
+  rangeKm = fin(s.soc) ? s.soc / 100 * NOMINAL_V * ah / (wk || DEFAULT_WH_KM) : null;
 
   // faults
   const list = [], has = b => !!(s.faults & (1 << b)), mcHas = b => !!(s.mcFault & (1 << b));
@@ -696,10 +710,12 @@ function render(s) {
   else { al.dataset.sev = "ok"; $("alertText").textContent = "All systems normal"; $("alertTag").textContent = ""; $("alertIco").setAttribute("href", "#i-ok"); }
 
   // kart zones: temperature limits plus the fault bits that belong to each part
+  const sc = worst(sev("cellLo", s.cellLo), sev("cellHi", s.cellHi));   // cells, for the battery zone
   const zb = has(0) ? "crit" : worst(sev("tBatt", s.tBatt), sc, has(4) || has(5) ? "warn" : "");
   const zm = mcHas(3) || mcHas(5) ? "crit" : worst(sev("tMot", s.tMot), has(6) ? "warn" : "");
   const zi = has(1) || has(3) || s.mcState === 5 || (s.mcFault & ~((1 << 3) | (1 << 5))) ? "crit" : worst(sev("tInv", s.tInv), has(7) ? "warn" : "");
-  $("z-battery").dataset.sev = zb; $("z-motor").dataset.sev = zm; $("z-inverter").dataset.sev = zi;
+  const zc = sev("coolant", s.coolant) || "";
+  $("z-battery").dataset.sev = zb; $("z-motor").dataset.sev = zm; $("z-inverter").dataset.sev = zi; $("z-cooling").dataset.sev = zc;
   $("kart").dataset.lamp = s.lamp === 1 ? "on" : s.lamp === 2 ? "off" : "auto";
   const word = z => z === "crit" ? "fault" : z === "warn" ? "warning" : z === "ok" ? "normal" : "no data";
   $("kart").setAttribute("aria-label", `Kart, top view. Battery ${word(zb)}, motor ${word(zm)}, inverter ${word(zi)}, lamps ${fin(s.lamp) ? LAMPS[s.lamp].toLowerCase() : "unknown"}.`);
@@ -707,11 +723,11 @@ function render(s) {
   const tf = (k, x) => fin(x) ? (x - 20) / (LIMITS[k][1] - 20) : null;
   zoneState = { battery: { sev: zb || "none", temp: tf("tBatt", s.tBatt) }, motor: { sev: zm || "none", temp: tf("tMot", s.tMot) },
     inverter: { sev: zi || "none", temp: tf("tInv", s.tInv) }, brakes: { sev: mcHas(10) ? "warn" : "none" }, tyres: { sev: "none" },
-    headlights: { sev: "none" }, rearlights: { sev: "none" }, driver: { sev: "none" }, lamp: s.lamp };
-  for (const b of $("parts").querySelectorAll("button")) b.dataset.sev = zoneState[b.dataset.part].sev;
+    headlights: { sev: "none" }, rearlights: { sev: "none" }, driver: { sev: "none" }, cooling: { sev: zc || "none", temp: tf("coolant", s.coolant) }, lamp: s.lamp };
   window.kartState = zoneState; if (window.kart3d) window.kart3d.update(zoneState);
   if (partOpen) renderPart();
-  if (window.hudRender) hudRender(s); else if (window.mapsTick) mapsTick();
+  if (window.hudRender) hudRender(s);
+  if (window.mapsTick) mapsTick();
 
   // Systems tiles
   setTile("vpack", fmt(s.v, 1), "V");
@@ -773,29 +789,7 @@ for (const id of ["cSpeed", "cPower"]) {
   c.addEventListener("pointermove", at); c.addEventListener("pointerdown", at);
   c.addEventListener("pointerleave", () => { chartHover[id] = null; frame(); });
 }
-function drawTrack(id, mini) {
-  const c = $(id); if (!visible(c)) return;
-  const [g, w, h] = sizeCanvas(c); g.clearRect(0, 0, w, h);
-  if (track.length < 2) { g.fillStyle = css("--fg2"); g.font = (mini ? "11px " : "14px ") + css("--font"); g.textAlign = "center";
-    g.fillText(mini ? "No GPS" : "Track appears once GPS has a fix", w / 2, h / 2 + 4); return; }
-  let la0 = Infinity, la1 = -Infinity, lo0 = Infinity, lo1 = -Infinity;
-  for (const [a, b] of track) { la0 = Math.min(la0, a); la1 = Math.max(la1, a); lo0 = Math.min(lo0, b); lo1 = Math.max(lo1, b); }
-  const k = Math.cos((la0 + la1) / 2 * Math.PI / 180), mx = (lo1 - lo0) * k * 111320, my = (la1 - la0) * 111320;  // metres
-  const pad = mini ? 8 : 16, foot = mini ? 0 : 14, sc = Math.min((w - 2 * pad) / Math.max(mx, 20), (h - 2 * pad - foot) / Math.max(my, 20));
-  const ox = (w - mx * sc) / 2, oy = (h - foot - my * sc) / 2;
-  const P = ([a, b]) => [ox + (b - lo0) * k * 111320 * sc, oy + (la1 - a) * 111320 * sc];
-  g.strokeStyle = css("--accent"); g.lineWidth = mini ? 1.6 : 2.5; g.lineJoin = "round"; g.lineCap = "round"; g.beginPath();
-  track.forEach((p, j) => { const [x, y] = P(p); j ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
-  const [sx, sy] = P(track[0]), [ex, ey] = P(track[track.length - 1]);
-  if (!mini) { g.fillStyle = css("--fg2"); g.beginPath(); g.arc(sx, sy, 4, 0, 7); g.fill(); }
-  g.fillStyle = css("--fg"); g.beginPath(); g.arc(ex, ey, mini ? 3.5 : 6, 0, 7); g.fill();
-  g.strokeStyle = css("--accent"); g.lineWidth = 2; g.stroke();
-  if (mini) return;
-  const m = niceMax(Math.max(mx, my) / 4), px = m * sc;                         // scale bar
-  g.strokeStyle = css("--fg2"); g.lineWidth = 2; g.beginPath(); g.moveTo(pad, h - 8); g.lineTo(pad + px, h - 8); g.stroke();
-  g.fillStyle = css("--fg2"); g.font = "11px " + css("--font"); g.textAlign = "left"; g.fillText(`${m} m`, pad + px + 6, h - 4);
-}
-function frame() { drawChart("cSpeed", "kmh", css("--accent"), 20, false); drawChart("cPower", "kw", css("--cool"), 10, true); drawTrack("cTrackMini", true); }
+function frame() { drawChart("cSpeed", "kmh", css("--accent"), 20, false); drawChart("cPower", "kw", css("--cool"), 10, true); }
 setInterval(frame, 500); window.addEventListener("resize", frame);
 
 // connection chip + staleness
@@ -812,12 +806,36 @@ setInterval(() => {
 // ---------- tabs + sheet ----------
 function showTab(t) {
   if (!$("view-" + t)) t = "drive";
-  for (const b of $("tabs").querySelectorAll("button")) b.dataset.tab === t ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current");
+  for (const b of $("menu").querySelectorAll("button")) b.dataset.tab === t ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current");
   for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== "view-" + t;
-  store.set("tab", t); window.scrollTo(0, 0); $("main").scrollTop = 0; frame();
+  document.body.dataset.tab = t; store.set("tab", t); window.scrollTo(0, 0); frame();
   if (t === "laps" && window.lapsMapShow) lapsMapShow();
+  if (t === "drive") { if (window.kart3d) kart3d.redraw(); if (window.miniMapShow) miniMapShow(); }
+  if (t === "settings") gfxUi();
 }
-$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); };
+// menu (top left): Drive, Systems, Laps, Settings
+function setMenu(open) {
+  $("menu").hidden = !open; $("menuBtn").setAttribute("aria-expanded", open);
+  if (open) ($("menu").querySelector('[aria-current="page"]') || $("menu").querySelector("button")).focus({ preventScroll: true });
+}
+$("menuBtn").onclick = () => setMenu($("menu").hidden);
+// pages sit one step above Drive: the Back button and the phone's back gesture both return to it
+function goTab(t) {
+  const onPage = history.state && history.state.page;
+  if (t === "drive") { if (onPage) history.back(); else showTab("drive"); return; }
+  if (!onPage) history.pushState({ page: 1 }, "");
+  showTab(t);
+}
+$("backBtn").onclick = () => goTab("drive");
+window.addEventListener("popstate", () => { if (!(history.state && history.state.page) && document.body.dataset.tab !== "drive" && !document.querySelector(".hud.open")) showTab("drive"); });
+$("menu").onclick = e => { const b = e.target.closest("button"); if (b) { goTab(b.dataset.tab); setMenu(false); $("menuBtn").focus({ preventScroll: true }); } };
+$("menu").addEventListener("keydown", e => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return; e.preventDefault();
+  const items = [...$("menu").querySelectorAll("button")], i = items.indexOf(document.activeElement);
+  items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+});
+document.addEventListener("pointerdown", e => { if (!$("menu").hidden && !e.target.closest(".menuwrap")) setMenu(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("menu").hidden) { setMenu(false); $("menuBtn").focus(); } });
 // one sheet at a time: the data source sheet or a part sheet
 let sheetTimer, openId = null, lastFocus = null;
 function openSheet(id = "sheet") {
@@ -840,21 +858,20 @@ $("chip").onclick = () => openSheet("sheet"); $("srcRow").onclick = () => openSh
 $("sheetClose").onclick = closeSheet; $("partClose").onclick = closeSheet; $("scrim").onclick = closeSheet;
 
 // ---------- kart parts ----------
-const PARTS = { driver: "Driver", battery: "Battery", motor: "Motor", inverter: "Motor controller", brakes: "Brakes", tyres: "Tyres", headlights: "Headlights", rearlights: "Rear lights" };
+const PARTS = { driver: "Driver", cooling: "Cooling", battery: "Battery", motor: "Motor", inverter: "Motor controller", brakes: "Brakes", tyres: "Tyres", headlights: "Headlights", rearlights: "Rear lights" };
 let partOpen = null, zoneState = {};
 function selectPart(p) {
   partOpen = p;
-  for (const b of $("parts").querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.part === p ? "true" : "false");
   if (window.kart3d) window.kart3d.select(p);
 }
 function openPart(p) {
   if (!PARTS[p]) return; selectPart(p); renderPart(); openSheet("partSheet"); }
-$("parts").onclick = e => { const b = e.target.closest("button"); if (b) openPart(b.dataset.part); };
 // tapping the kart (3D or the flat view) or the minimap opens the full dashboard (hud.js)
 $("kart").addEventListener("click", e => { const z = e.target.closest("[data-part]"); if (z) openPart(z.dataset.part); });   // flat view
 window.addEventListener("kartpart", e => openPart(e.detail));                                                     // 3D view, split apart
 if (store.get("kartSplitSeen", "")) $("kHint").hidden = true;
-$("cTrackMini").addEventListener("click", () => window.openHud && openHud());
+$("miniMap").addEventListener("click", () => window.openMapFull && openMapFull());
+$("miniMap").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && window.openMapFull) { e.preventDefault(); openMapFull(); } });
 function partInfo(p, s) {
   const has = b => !!(s.faults & (1 << b)), mc = b => !!(s.mcFault & (1 << b)), u = (x, d, unit) => fin(x) ? `${fmt(x, d)} ${unit}` : "--";
   const F = list => list.filter(([on]) => on).map(([, t]) => t);
@@ -875,6 +892,9 @@ function partInfo(p, s) {
     case "driver": return { rows: [["Drive mode", fin(s.mode) ? MODES[s.mode] : "--"], ["Speed", u(s.kmh, 0, "km/h")], ["Throttle", u(s.thr, 0, "%")],
       ["Current lap", lapStart ? mmss(Date.now() - lapStart) : "Not started"], ["Controls", $("pinState") ? $("pinState").textContent : "--"]], faults: [],
       note: "Tap the kart (when it is not split) for the full driver's dashboard." };
+    case "cooling": return { rows: [["Coolant", fin(s.coolant) ? u(s.coolant, 0, "°C") : "No sensor yet"], ["Motor", u(s.tMot, 0, "°C")],
+      ["Motor controller", u(s.tInv, 0, "°C")], ["Fan and pump", "Not reported yet"]], faults: F([[has(6), FAULT_TEXT[6]], [has(7), FAULT_TEXT[7]]]),
+      note: "Radiator with an electric fan and a pump at the back of the kart, cooling the motor and the motor controller. The kart does not send fan or pump status yet." };
     case "headlights": return { rows: [["Headlamp setting", fin(s.lamp) ? LAMPS[s.lamp] : "--"]], faults: [],
       note: "This is the setting the app sent to the kart (Auto, On or Off), not a measured lamp state. Change it with Lamps on the Drive screen." };
     case "rearlights": return { rows: [["Brake light", "Not reported yet"], ["Regen braking", fin(s.i) && s.i < 0 ? `${fmt(-s.i, 0)} A` : "0 A"],
@@ -889,7 +909,7 @@ function renderPart() {
   const st = $("partStatus"); st.dataset.sev = z.sev;
   $("partStatusIco").setAttribute("href", z.sev === "crit" ? "#i-stop" : z.sev === "warn" ? "#i-warn" : "#i-ok");
   $("partStatusText").textContent = !last ? "No data yet" : z.sev === "crit" ? "Fault" : z.sev === "warn" ? "Needs attention"
-    : z.sev === "ok" ? "Normal" : (p === "brakes" || p === "tyres" || p === "rearlights") ? "No sensor" : "Live";
+    : z.sev === "ok" ? "Normal" : (p === "brakes" || p === "tyres" || p === "rearlights" || (p === "cooling" && !fin(s.coolant))) ? "No sensor" : "Live";
   $("partRows").innerHTML = info.rows.map(([k, v]) => `<div class="rowi"><span>${k}</span><span class="num">${v}</span></div>`).join("");
   $("partRows").hidden = !info.rows.length;
   $("partFaults").innerHTML = info.faults.map(t => `<li><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg>${t}</li>`).join("");
@@ -902,7 +922,7 @@ for (const id of ["btnBle", "btnCloud", "btnDemo", "btnStop"]) $(id).addEventLis
 let stopFn = null, bleRx = null, authed = false;
 function setSource(name, stop) {
   if (stopFn) stopFn();
-  if (source === "demo" && name !== "demo") { hist = []; track = []; rec = []; }   // never mix demo data into a real session
+  if (source === "demo" && name !== "demo") { hist = []; track = []; rec = []; lapTrack = []; lastFix = null; }   // never mix demo data into a real session
   stopFn = stop; source = name; lastRx = 0; authed = false;
   $("btnStop").hidden = !name; $("btnDemo").setAttribute("aria-pressed", name === "demo");
   $("srcVal").textContent = name ? SRC_NAME[name] : "None";
@@ -1019,17 +1039,25 @@ $("segLamp").onclick = e => { const b = e.target.closest("button"); if (b && !b.
 let lapStart = 0, best = Infinity, lastLapMs = 0;
 const mmss = ms => { const s = ms / 1000; return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`; };
 function lapUi() {
-  $("lapLbl").textContent = lapStart ? `Lap ${lapNo}` : "Lap timer";
-  $("lapSub").textContent = !lapStart ? "Tap the flag at the start" : lapNo > 1 ? `Last ${mmss(lastLapMs)} · Best ${mmss(best)}` : "Timing first lap";
+  const p = $("lapPill"); if (!p) return;                           // lap timing lives on the driver's dashboard
+  if (!lapStart) { p.className = "lappill glass idle";
+    p.innerHTML = '<button class="start" type="button" data-act="lap"><span class="pbtn"><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg></span>Start lap</button>'; return; }
+  p.className = "lappill glass";
+  p.innerHTML = `<div><div class="t num" id="lapNow">${mmss(Date.now() - lapStart)}</div><div class="sub num">Lap ${lapNo}${best < Infinity ? " · Best " + mmss(best) : ""}</div></div>
+    <button class="pbtn" type="button" data-act="lap" aria-label="Mark lap"><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg></button>
+    <button class="pbtn stop" type="button" data-act="stop" aria-label="Stop lap timing"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>`;
 }
 function markLap() {
   const now = Date.now();
   if (lapStart) { lastLapMs = now - lapStart; best = Math.min(best, lastLapMs); $("lastLap").textContent = mmss(lastLapMs); $("bestLap").textContent = mmss(best); }
   lapStart = now; lapNo++; $("lapCount").textContent = Math.max(0, lapNo - 1);
-  toast(lapNo === 1 ? "Lap timer started" : `Lap ${lapNo - 1} recorded`); lapUi();
+  lapTrack = lastFix ? [lastFix] : [];                                     // new lap: the map line starts over
+  toast(lapNo === 1 ? "Lap timer started" : `Lap ${lapNo - 1} recorded`); lapUi(); if (window.mapsTick) mapsTick();
 }
-$("btnLap").onclick = markLap; $("btnLapDrive").onclick = markLap;
-setInterval(() => { if (lapStart) $("lapNow").textContent = mmss(Date.now() - lapStart); }, 100);
+function stopLaps() { lapStart = 0; lapTrack = []; lapUi(); toast("Lap timing stopped"); if (window.mapsTick) mapsTick(); }
+if ($("lapPill")) $("lapPill").onclick = e => { const b = e.target.closest("button"); if (!b) return; b.dataset.act === "stop" ? stopLaps() : markLap(); };
+$("btnLap").onclick = markLap;
+setInterval(() => { const el = $("lapNow"); if (lapStart && el) el.textContent = mmss(Date.now() - lapStart); }, 100);
 const COLS = ["t", "lap", "kmh", "rpm", "soc", "v", "i", "kw", "cellHi", "cellLo", "tBatt", "tMot", "tInv", "coolant", "v12", "thr", "mcState", "mcFault", "faults", "lat", "lon", "sats", "fix", "pitch", "roll", "mode", "lamp"];
 $("btnCsv").onclick = () => {
   if (!rec.length) return toast("Nothing recorded yet");
@@ -1041,8 +1069,8 @@ $("btnCsv").onclick = () => {
 };
 $("btnClear").onclick = () => {
   if (rec.length && !confirm(`Clear ${rec.length.toLocaleString("en-US")} recorded samples and lap times? Download the CSV first if you need them.`)) return;
-  rec = []; hist = []; track = []; lapNo = 0; lapStart = 0; best = Infinity; lastLapMs = 0;
-  for (const id of ["lastLap", "bestLap"]) $(id).textContent = "--"; $("lapCount").textContent = "0"; $("lapNow").textContent = "0:00.0";
+  rec = []; hist = []; track = []; lapTrack = []; lapNo = 0; lapStart = 0; best = Infinity; lastLapMs = 0;
+  for (const id of ["lastLap", "bestLap"]) $(id).textContent = "--"; $("lapCount").textContent = "0";
   $("recCount").textContent = "0 samples recorded"; lapUi(); frame();
 };
 
@@ -1055,10 +1083,33 @@ window.addEventListener("appinstalled", () => { $("installBox").hidden = true; t
 // ---------- misc ----------
 async function wakeLock() { try { if (navigator.wakeLock) await navigator.wakeLock.request("screen"); } catch (e) {} }
 $("fbUrl").value = store.get("fbUrl", ""); $("pin").value = store.get("pin", ""); $("packAh").value = store.get("packAh", "");
-$("opt3d").checked = store.get("kart3d", "on") !== "off";
-$("opt3d").addEventListener("change", () => { store.set("kart3d", $("opt3d").checked ? "on" : "off"); toast("Close and reopen the app to apply"); });
-$("redArc").style.strokeDasharray = `${(1 - RPM_RED / RPM_MAX) * 100} 100`; $("redArc").style.strokeDashoffset = -RPM_RED / RPM_MAX * 100;
-$("rpmMaxTxt").textContent = RPM_MAX / 1000 + "k";
+// graphics quality (read by kart3d.js when the page loads)
+const LEVEL_NAME = { high: "High", balanced: "Balanced", smooth: "Smooth", off: "Off" };
+function gfxUi() {
+  const now = store.get("gfx", store.get("kart3d", "") === "off" ? "off" : "auto");
+  for (const b of $("gfxGroup").querySelectorAll("button")) b.setAttribute("aria-checked", b.dataset.v === now);
+  $("gfxAutoNow").textContent = now === "auto" && window.kart3dLevel ? `Now ${LEVEL_NAME[window.kart3dLevel]}` : "";
+}
+$("gfxGroup").onclick = e => {
+  const b = e.target.closest("button"); if (!b || b.getAttribute("aria-checked") === "true") return;
+  store.set("gfx", b.dataset.v); store.set("kart3d", ""); gfxUi(); toast("Applying graphics setting…"); setTimeout(() => location.reload(), 500);
+};
+// clock and date: full screen hides the phone's own status bar
+function tickClock() {
+  const d = new Date();
+  $("clock").textContent = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  $("dateTxt").textContent = d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+}
+tickClock(); setInterval(tickClock, 10000);
+// phones stay full screen: the installed app opens that way; in a browser tab the first tap enters it (browsers need a tap)
+const wantFull = matchMedia("(pointer: coarse)").matches;
+document.addEventListener("click", () => {
+  if (wantFull && document.fullscreenEnabled && !document.fullscreenElement && !matchMedia("(display-mode: fullscreen)").matches)
+    document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+}, true);
+// dials
+buildDial("speedDial", { min: 0, max: RPM_MAX, major: 1000, minor: 500, label: v => v / 1000, red: RPM_RED });
+buildDial("kwDial", { min: KWD[0], max: KWD[1], major: 20, minor: 10, zero: 0 });
 try { if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
 showTab(store.get("tab", "drive")); syncControls(); lapUi();
 // opened by double-clicking the file: browsers block the 3D model and offline mode there, so say how to open it properly

@@ -1,5 +1,5 @@
 // hud.js : the full-screen dashboard from the team's reference image (opened by tapping the kart), plus the live maps.
-// Uses app.html's globals: $, fmt, fin, last, track, lapStart, lapNo, best, lastLapMs, markLap, openPart, openId, zoneState,
+// Uses app.html's globals: $, fmt, fin, last, track, lastFix, lapTrack, lapStart, lapNo, best, lastLapMs, markLap, openPart, openId, zoneState,
 // LIMITS, TEMPS, FAULT_TEXT, MC_FAULT, CRIT_MASK, MODES, RPM_MAX, RPM_RED, KW_MIN, KW_MAX, V_MIN, V_MAX.
 // Maps: Leaflet with OpenStreetMap tiles (free, no key; the dark look is a CSS filter). Tiles need internet; the service worker keeps
 // the ones you have seen. OSM asks for light use and visible attribution: fine for a team app, not for a public site with many users.
@@ -23,26 +23,42 @@ function updateHeading() {                                    // from the last G
   for (let j = n - 2; j >= Math.max(0, n - 30); j--) if (metres(track[j], track[n - 1]) > 1.5) { heading = bearing(track[j], track[n - 1]); return; }
 }
 
-function makeMap(el, { theme = "dark", follow = true } = {}) {
-  const map = L.map(el, { zoomControl: false, attributionControl: true, zoomSnap: 0.5, minZoom: 3, maxZoom: 20 }).setView(MAP_HOME, 17);
-  map.attributionControl.setPrefix(false);
+// Every map shows the kart where it is; the track line appears only while a lap is being timed and starts over every lap.
+// mini: the round Drive-screen map, north-up, always centred on the kart, no gestures (the arrow over it is drawn in app.html)
+function makeMap(el, { theme = "dark", follow = true, mini = false } = {}) {
+  const map = L.map(el, { zoomControl: false, attributionControl: !mini, zoomSnap: 0.5, minZoom: 3, maxZoom: 20, fadeAnimation: !mini,
+    ...(mini ? { dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false } : {}) }).setView(MAP_HOME, 17);
+  if (!mini) map.attributionControl.setPrefix(false);                        // the mini map's credit is in Settings > About
   const tiles = L.tileLayer(TILE_URL, { maxZoom: 20, maxNativeZoom: 19, attribution: TILE_ATTR, className: theme === "dark" ? "tiles-dark" : "" }).addTo(map);
-  const line = L.polyline([], { color: "#ff8a1f", weight: 3.5, opacity: .95, className: "trackline", interactive: false }).addTo(map);
+  const line = L.polyline([], { color: "#ff8a1f", weight: mini ? 3 : 3.5, opacity: .95, className: "trackline", interactive: false }).addTo(map);
   const start = L.circleMarker(MAP_HOME, { radius: 5, color: "#fff", weight: 2, fillColor: "#2fbf4a", fillOpacity: 1, interactive: false });
   const kart = L.marker(MAP_HOME, { icon: L.divIcon({ className: "kartmk", html: KART_ICON, iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false, keyboard: false });
   const m = { map, follow, fitted: false, setTheme(t) { tiles.getContainer().classList.toggle("tiles-dark", t === "dark"); } };
   map.on("dragstart", () => { m.follow = false; m.onFollow && m.onFollow(false); });
   m.update = () => {
-    if (!track.length) { if (map.hasLayer(kart)) { kart.remove(); start.remove(); line.setLatLngs([]); } return; }
-    const p = track[track.length - 1];
-    line.setLatLngs(track); start.setLatLng(track[0]); kart.setLatLng(p);
-    if (!map.hasLayer(kart)) { kart.addTo(map); start.addTo(map); }
-    const rot = kart.getElement() && kart.getElement().querySelector(".rot"); if (rot) rot.setAttribute("transform", `rotate(${heading.toFixed(0)})`);
-    if (m.follow) map.panTo(p, { animate: true, duration: 0.4 });
-    else if (!m.fitted && track.length > 5) { map.fitBounds(line.getBounds(), { padding: [24, 24], maxZoom: 18 }); m.fitted = true; }
+    const lap = lapStart ? lapTrack : [];
+    line.setLatLngs(lap);
+    if (lap.length && !mini) { start.setLatLng(lap[0]); if (!map.hasLayer(start)) start.addTo(map); } else if (map.hasLayer(start)) start.remove();
+    if (!lastFix) { if (map.hasLayer(kart)) kart.remove(); return; }
+    if (!mini) {
+      kart.setLatLng(lastFix); if (!map.hasLayer(kart)) kart.addTo(map);
+      const rot = kart.getElement() && kart.getElement().querySelector(".rot"); if (rot) rot.setAttribute("transform", `rotate(${heading.toFixed(0)})`);
+    }
+    if (m.follow || mini) map.panTo(lastFix, { animate: !mini, duration: 0.45 });
+    else if (!m.fitted && lap.length > 5) { map.fitBounds(line.getBounds(), { padding: [24, 24], maxZoom: 18 }); m.fitted = true; }
   };
   return m;
 }
+
+// Drive screen: the round mini map in the top-right corner
+let miniMap = null;
+function miniMapShow() {
+  const el = $("miniMapCanvas"); if (!el || typeof L === "undefined") return;
+  if (!miniMap) miniMap = makeMap(el, { mini: true });
+  setTimeout(() => { miniMap.map.invalidateSize(); miniMap.update(); }, 0);
+}
+window.miniMapShow = miniMapShow;
+window.addEventListener("resize", () => { if (miniMap) miniMap.map.invalidateSize(); });
 
 // Laps tab: whole-session map, follows the theme
 let lapsMap = null;
@@ -118,6 +134,7 @@ function hudMarkup() {
         <button class="mbtn" type="button" id="hZoomOut" aria-label="Zoom out">−</button>
         <button class="mbtn" type="button" id="hFollow" aria-pressed="true" aria-label="Follow the kart"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
         <button class="mbtn" type="button" id="hFit" aria-label="Show the whole track"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        <button class="mbtn" type="button" id="hBig" aria-label="Full-screen map"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
       </div>
       <div class="mapnote" id="hMapNote">Waiting for GPS fix</div></div></div>
     <div class="hp h-temps cut-l"><div class="in">
@@ -138,7 +155,7 @@ function hudMarkup() {
 }
 
 // ---------- open / close ----------
-let hudMap = null, hudBuilt = false, hudTimer = null, wentFull = false;
+let hudMap = null, hudBuilt = false, hudTimer = null, locked = false;
 function buildHud() {
   document.body.insertAdjacentHTML("beforeend", hudMarkup()); hudBuilt = true;
   $("hud").addEventListener("click", e => { const b = e.target.closest("[data-part]"); if (b) openPart(b.dataset.part); });
@@ -146,7 +163,8 @@ function buildHud() {
   $("hLapBtn").onclick = () => markLap();
   $("hZoomIn").onclick = () => hudMap && hudMap.map.zoomIn(); $("hZoomOut").onclick = () => hudMap && hudMap.map.zoomOut();
   $("hFollow").onclick = () => { if (!hudMap) return; hudMap.follow = !hudMap.follow; $("hFollow").setAttribute("aria-pressed", hudMap.follow); hudMap.update(); };
-  $("hFit").onclick = () => { if (!hudMap || track.length < 2) return; hudMap.follow = false; $("hFollow").setAttribute("aria-pressed", "false"); hudMap.map.fitBounds(L.latLngBounds(track), { padding: [30, 30], maxZoom: 18 }); };
+  $("hFit").onclick = () => { if (!hudMap || lapTrack.length < 2) return; hudMap.follow = false; $("hFollow").setAttribute("aria-pressed", "false"); hudMap.map.fitBounds(L.latLngBounds(lapTrack), { padding: [30, 30], maxZoom: 18 }); };
+  $("hBig").onclick = () => openMapFull();
   $("hKwZero").style.left = (-KW_MIN / (KW_MAX - KW_MIN) * 100) + "%";
 }
 function openHud() {
@@ -155,14 +173,14 @@ function openHud() {
   h.hidden = false; requestAnimationFrame(() => h.classList.add("open"));
   document.documentElement.style.overflow = "hidden";
   history.pushState({ hud: 1 }, "");
-  // phones: go full screen and turn sideways when the browser allows it (Chrome on Android does, iPhone browsers do not)
-  if (matchMedia("(pointer: coarse)").matches && document.fullscreenEnabled && !document.fullscreenElement) {
-    document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => { wentFull = true; return screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape"); }).catch(() => {});
-  }
-  if (typeof L !== "undefined") {
+  // the app is already full screen on phones; turn sideways too when the browser allows it (Chrome on Android does, iPhone browsers do not)
+  if (document.fullscreenElement && screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").then(() => { locked = true; }).catch(() => {});
+  // the map is created after the fade-in, so it never competes with the transition for frames
+  if (typeof L !== "undefined") setTimeout(() => {
     if (!hudMap) { hudMap = makeMap($("hMap"), { theme: "dark", follow: true }); hudMap.onFollow = f => $("hFollow").setAttribute("aria-pressed", f); }
-    setTimeout(() => { hudMap.map.invalidateSize(); hudMap.update(); }, 60);
-  } else $("hMapNote").textContent = "Map unavailable";
+    hudMap.map.invalidateSize(); hudMap.update();
+  }, 300);
+  else $("hMapNote").textContent = "Map unavailable";
   if (last) hudRender(last);
   clearInterval(hudTimer); hudTimer = setInterval(hudTick, 100);
   $("hudClose").focus({ preventScroll: true });
@@ -172,14 +190,57 @@ function closeHud(fromPop) {
   h.classList.remove("open"); setTimeout(() => { h.hidden = true; }, 250);
   document.documentElement.style.overflow = "";
   clearInterval(hudTimer);
-  if (wentFull && document.fullscreenElement) { try { screen.orientation.unlock(); } catch (e) {} document.exitFullscreen().catch(() => {}); }
-  wentFull = false;
+  if (locked) { try { screen.orientation.unlock(); } catch (e) {} locked = false; }
   if (window.kart3d && kart3d.home) kart3d.home();                              // camera back out of the driver's seat
   if (!fromPop && history.state && history.state.hud) history.back();
 }
-window.addEventListener("popstate", () => closeHud(true));
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !openId) closeHud(); });
+// back gesture: the full-screen map closes first, then the dashboard
+window.addEventListener("popstate", () => { const st = history.state || {}; if (!st.mapfull) closeMapFull(true); if (!st.hud && !st.mapfull) closeHud(true); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape" || openId) return; const mf = $("mapFull"); if (mf && !mf.hidden) closeMapFull(); else closeHud(); });
+
+// Full-screen map: opened from the Drive screen's round map or the dashboard's map; Back (or the phone's back gesture) closes it
+let fullMap = null;
+function buildMapFull() {
+  const d = document.createElement("div"); d.className = "hud mapfull"; d.id = "mapFull"; d.hidden = true;
+  d.setAttribute("role", "dialog"); d.setAttribute("aria-label", "Map");
+  d.innerHTML = `<div id="mfMap" role="application" aria-label="Live track map"></div>
+    <button class="mfback" type="button" id="mfBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back</button>
+    <div class="mapui br">
+      <button class="mbtn" type="button" id="mfIn" aria-label="Zoom in">+</button>
+      <button class="mbtn" type="button" id="mfOut" aria-label="Zoom out">−</button>
+      <button class="mbtn" type="button" id="mfFollow" aria-pressed="true" aria-label="Follow the kart"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+      <button class="mbtn" type="button" id="mfFit" aria-label="Show the whole lap"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+    <div class="mapnote" id="mfNote">Waiting for GPS fix</div>`;
+  document.body.appendChild(d);
+  $("mfBack").onclick = () => closeMapFull();
+  $("mfIn").onclick = () => fullMap && fullMap.map.zoomIn(); $("mfOut").onclick = () => fullMap && fullMap.map.zoomOut();
+  $("mfFollow").onclick = () => { if (!fullMap) return; fullMap.follow = !fullMap.follow; $("mfFollow").setAttribute("aria-pressed", fullMap.follow); fullMap.update(); };
+  $("mfFit").onclick = () => { if (!fullMap || lapTrack.length < 2) return; fullMap.follow = false; $("mfFollow").setAttribute("aria-pressed", "false"); fullMap.map.fitBounds(L.latLngBounds(lapTrack), { padding: [40, 40], maxZoom: 18 }); };
+}
+function openMapFull() {
+  if (!$("mapFull")) buildMapFull();
+  const d = $("mapFull"); if (!d.hidden) return;
+  d.hidden = false; requestAnimationFrame(() => d.classList.add("open"));
+  history.pushState({ mapfull: 1 }, "");
+  $("mfNote").hidden = !!lastFix;
+  if (typeof L === "undefined") { $("mfNote").textContent = "Map unavailable"; return; }
+  setTimeout(() => {
+    if (!fullMap) { fullMap = makeMap($("mfMap"), { theme: "dark", follow: true }); fullMap.onFollow = f => $("mfFollow").setAttribute("aria-pressed", f); }
+    fullMap.map.invalidateSize(); fullMap.update();
+  }, 120);
+  $("mfBack").focus({ preventScroll: true });
+}
+function closeMapFull(fromPop) {
+  const d = $("mapFull"); if (!d || d.hidden) return;
+  d.classList.remove("open"); setTimeout(() => { d.hidden = true; }, 250);
+  if (!fromPop && history.state && history.state.mapfull) history.back();
+}
+window.openMapFull = openMapFull;
 window.addEventListener("kartopen", openHud);
+// build the dashboard ahead of time (idle moment, or as the fly-in starts) so opening it never stutters
+window.addEventListener("kartopening", () => { if (!hudBuilt) buildHud(); });
+(window.requestIdleCallback || (fn => setTimeout(fn, 1500)))(() => { if (!hudBuilt) buildHud(); });
 window.openHud = openHud;
 
 // ---------- live values ----------
@@ -196,7 +257,7 @@ function hudRender(s) {
   $("hV").textContent = fmt(s.v, 1);
   const vf = fin(s.v) ? Math.max(0, Math.min(1, (s.v - V_MIN) / (V_MAX - V_MIN))) : 0, on = Math.round(vf * SEGS);
   $("hSegs").querySelectorAll("i").forEach((el, i) => { el.className = i < on ? (i < 3 ? "on low" : i < 6 ? "on mid" : "on") : ""; });
-  $("hSoc").textContent = `SoC ${fmt(s.soc, 0)}%`; $("hRange").textContent = `Range ~${$("range").textContent} km`;
+  $("hSoc").textContent = `SoC ${fmt(s.soc, 0)}%`; $("hRange").textContent = `Range ~${fin(rangeKm) ? fmt(rangeKm, rangeKm < 10 ? 1 : 0) : "--"} km`;
   // speed + rpm
   $("hKmh").textContent = fmt(s.kmh, 0);
   $("hRpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
@@ -231,8 +292,18 @@ function hudRender(s) {
   ha.hidden = !(al.dataset.sev === "warn" || al.dataset.sev === "crit"); ha.dataset.sev = al.dataset.sev;
   $("hAlertT").textContent = `${$("alertTag").textContent}: ${$("alertText").textContent}`;
   // map, twice a second
-  $("hMapNote").hidden = !!track.length;
-  if (++mapTick % 2 === 0) { updateHeading(); if (hudMap) hudMap.update(); if (lapsMap && !$("view-laps").hidden) lapsMap.update(); }
+  $("hMapNote").hidden = !!lastFix;
 }
 window.hudRender = hudRender;
-window.mapsTick = () => { updateHeading(); if (lapsMap && !$("view-laps").hidden) lapsMap.update(); };
+// called on every sample: heading arrow every time, maps twice a second
+window.mapsTick = () => {
+  updateHeading();
+  const a = $("mmArrow"); if (a) a.style.transform = `rotate(${heading.toFixed(0)}deg)`;
+  const n = $("mmNote"); if (n) n.hidden = !!lastFix;
+  if (++mapTick % 2) return;
+  if (miniMap && !$("view-drive").hidden) miniMap.update();
+  if (hudMap && $("hud") && !$("hud").hidden) hudMap.update();
+  if (lapsMap && !$("view-laps").hidden) lapsMap.update();
+  if (fullMap && !$("mapFull").hidden) { fullMap.update(); $("mfNote").hidden = !!lastFix; }
+};
+if (document.body.dataset.tab === "drive") miniMapShow();
