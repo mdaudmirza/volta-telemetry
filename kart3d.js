@@ -39,9 +39,9 @@ const startLevel = pref === "auto" ? (capable ? "high" : "balanced") : pref;
 // ---- parts the website model does not have, drawn here where the team's layout puts them ----
 // Battery T (team drawing): the crossbar stands upright right behind the seat backs, almost the full width; the stem runs forward,
 // low, between the two seats and out past their front edge.
-const PACK = { BAR: { w: 0.8, y0: 0.62, y1: 0.80, z0: -0.44, z1: 0.04 }, STEM: { w: 0.14, y0: -0.55, y1: 0.62, z0: -0.44, z1: -0.16 } };
+const PACK = { BAR: { w: 0.6, y0: 0.64, y1: 0.78, z0: -0.44, z1: -0.14 }, STEM: { w: 0.1, y0: -0.5, y1: 0.64, z0: -0.44, z1: -0.24 } };   // drawn smaller than the real pack so it sits in proportion
 // Motor controller: on the rear face of the battery crossbar. Motor: across the rear. Cooling: radiator and fan above the motor at the very back.
-const CTRL = { y: 0.835, z: -0.14 }, MOTOR = { y: 1.0, z: -0.24 }, RAD = { y: 1.15, z: 0.0 };
+const CTRL = { y: 0.815, z: -0.2 }, MOTOR = { y: 1.0, z: -0.24 }, RAD = { y: 1.15, z: 0.0 };
 
 // Part zones as boxes [xmin, ymin, zmin, xmax, ymax, zmax] on |x| (mirrored left/right), used for state tints and highlights
 const ZONES = {
@@ -305,7 +305,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
       c.textAlign = "left"; c.fillStyle = "#fff"; c.font = "800 66px Inter, Arial, sans-serif"; c.fillText("HV 336 V", 145, 112);
       c.fillStyle = "#a3a7ae"; c.font = "600 38px Inter, Arial, sans-serif"; c.fillText("LiFePO4 battery", 145, 168);
     });
-    const lid = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.15), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
+    const lid = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.12), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
     lid.position.set(0, (B.y0 + B.y1) / 2, B.z1 + 0.002); lid.userData.part = "battery"; g.add(lid);
     return g;
   }
@@ -389,7 +389,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   function dist() {
     // the kart seen from the default angle is about 3 m wide and 1.6 m tall on screen: fit each way separately so it fills the space
     const t = Math.tan(camera.fov * Math.PI / 360), vf = Math.atan(t * safe.h), hf = Math.atan(t * camera.aspect * safe.w);
-    return Math.max(1.45 / Math.sin(hf), 0.8 / Math.sin(vf), 2.2);
+    return Math.max(1.45 / Math.sin(hf), 0.8 / Math.sin(vf), 2.2) * (camera.aspect > 1 ? 1.38 : 1.12);   // a little air around the kart (less when upright: the width already limits it)
   }
   function fit() { const d = dist(); controls.minDistance = d * 0.5; controls.maxDistance = d * 1.6; }
   function view(name, now, onDone, splitFor = splitTo) {
@@ -446,8 +446,19 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     lastFrame = t;
     need = false;
     if (composer && !flight) composer.render(); else renderer.render(scene, camera);   // the fly-in skips AO: smoother, and it would be inside the car anyway
-    placeLabels();
+    placeLabels(); placeStudio();
   });
+  // studio backdrop (CSS on .stage): keep the cove line (floor meets wall) and the light pool under the kart lined up with the camera
+  const stage = host.closest(".stage"), hzP = new THREE.Vector3(), fwd = new THREE.Vector3();
+  function placeStudio() {
+    if (!stage) return;
+    camera.getWorldDirection(fwd); fwd.z = 0; if (fwd.lengthSq() < 1e-6) return; fwd.normalize();
+    hzP.set(0, 0, GROUND).addScaledVector(fwd, 2.6); hzP.project(camera);   // the cove where floor meets wall, 2.6 m behind the kart
+    const fl = new THREE.Vector3(0, 0, GROUND).add(comps.chassis.position).project(camera);
+    stage.style.setProperty("--hz", ((1 - hzP.y) / 2 * 100).toFixed(1) + "%");
+    stage.style.setProperty("--fx", ((fl.x + 1) / 2 * 100).toFixed(1) + "%");
+    stage.style.setProperty("--fy", ((1 - fl.y) / 2 * 100).toFixed(1) + "%");
+  }
   function stepDown() {
     slow = 0;
     if (L.ao) { L = { ...L, ao: false }; composer = null; renderer.setPixelRatio(dpr = Math.min(window.devicePixelRatio || 1, 1.5)); resize(); console.info("graphics: AO off"); }

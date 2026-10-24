@@ -137,10 +137,23 @@ body[data-tab="drive"] { overflow: hidden; color-scheme: dark;
 body { --mode: #ff8a1f; --mode-rgb: 255,138,31; }
 body[data-mode="eco"] { --mode: #2fbf4a; --mode-rgb: 47,191,74; }
 body[data-mode="sport"] { --mode: #ff3b30; --mode-rgb: 255,59,48; }
+/* a fine vignette frames the stage like a lens */
+.stage::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); }
 .stage::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .6s;
   background: radial-gradient(90% 60% at 50% 100%, rgba(var(--mode-rgb),.16), transparent 70%), radial-gradient(70% 40% at 50% 0%, rgba(var(--mode-rgb),.07), transparent); }
 body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opacity: 1; }
-.stage { --g: clamp(136px, 31vmin, 232px); position: absolute; inset: 0; background: #0b0c0e; color: #fff; overflow: hidden;
+/* studio backdrop: a graphite cyclorama, the wall curving into the floor at a soft horizon band, an overhead softbox,
+   and a pool of light under the kart. The 3D view moves --hz (horizon) and --fx/--fy (under the kart) with the camera. */
+.stage { --g: clamp(136px, 31vmin, 232px); --hz: 38%; --fx: 50%; --fy: 62%; position: absolute; inset: 0; color: #fff; overflow: hidden;
+  background-color: #0a0b0d;
+  background-image:
+    radial-gradient(ellipse 30% 12% at var(--fx) var(--fy), rgba(255,255,255,.2), rgba(255,255,255,.06) 50%, transparent 75%),
+    radial-gradient(ellipse 60% 9% at 50% var(--hz), rgba(255,255,255,.12), transparent 75%),
+    radial-gradient(ellipse 110% 18% at 50% var(--hz), rgba(var(--mode-rgb),.12), transparent 70%),
+    radial-gradient(ellipse 70% 55% at 50% -8%, rgba(220,230,245,.22), transparent 72%),
+    linear-gradient(180deg, #0c0d10 0%, #1d2026 calc(var(--hz) - 24%), #343943 calc(var(--hz) - 1%), #3b404a var(--hz),
+      #23272d calc(var(--hz) + 8%), #15171b calc(var(--hz) + 30%), #08090b 100%);
   -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .kartwrap { position: absolute; inset: 0; }
 .kartwrap .kart { position: absolute; inset: 0; margin: auto; width: min(56vw, 280px); height: min(56vh, 400px); }
