@@ -520,7 +520,6 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
       applyState(performance.now()); need = true;
     }, on ? 1 : 0);
     try { localStorage.setItem("kartSplitSeen", "1"); } catch (e) {}
-    const hint = document.getElementById("kHint"); if (hint) hint.hidden = true;
   }
 
   // ---- taps (not drags) ----

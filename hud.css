@@ -162,9 +162,12 @@ button.hp:focus-visible { outline: none; background: #fff; }
 
 /* sideways fit-up: centre readouts on their gauges, keep the close button clear of the voltage scale */
 @media (min-aspect-ratio: 1/1) { .h-volt .in { padding-left: 58px; } }
-.spdc { position: absolute; left: 0; right: 0; top: 47%; transform: translateY(-50%); margin: 0; gap: 2px; }
-.spdc .big { font-size: clamp(44px, min(9vw, 16vh), 92px); }
-.mode-chip { left: auto; right: 34px; bottom: 6px; transform: none; }
+/* the speed sits in the lower middle of the RPM gauge, the one area the scale numbers leave free */
+.spdc { position: absolute; left: 0; right: 0; top: 66%; transform: translateY(-50%); margin: 0; gap: 2px; }
+.spdc .big { font-size: clamp(34px, min(7vw, 11vh), 72px); }
+/* map buttons: five fit the short panel */
+.h-map .mbtn { width: 34px; height: 34px; border-radius: 10px; } .h-map .mapui.br { gap: 4px; bottom: 22px; }
+.mode-chip { left: auto; right: 12px; top: 8px; bottom: auto; transform: none; }   /* top corner: clear of the scale and the readout */
 .h-amps .hl.top { position: absolute; top: 10px; left: 14px; }
 .ampc { position: absolute; left: 0; right: 0; top: 66%; margin: 0; }
 .ampc .hv { font-size: clamp(20px, min(3.2vw, 7vh), 32px); }

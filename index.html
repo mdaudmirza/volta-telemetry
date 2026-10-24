@@ -163,21 +163,21 @@ body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opa
 .stage3d canvas { width: 100% !important; height: 100% !important; display: block; cursor: grab; }
 /* where the car is framed: the space the instruments leave (the 3D view reads this box) */
 .carsafe { position: absolute; left: 6vw; right: 6vw; top: calc(64px + env(safe-area-inset-top, 0px)); bottom: calc(var(--g) * .42); pointer-events: none; }
-.kartwrap.flying ~ .gauge, .kartwrap.flying ~ .minimap, .kartwrap.flying ~ .khint { opacity: 0; }
-.gauge, .minimap, .khint { transition: opacity .25s ease; }
+.kartwrap.flying ~ .gauge, .kartwrap.flying ~ .minimap { opacity: 0; }
+.gauge, .minimap { transition: opacity .25s ease; }
 
 /* instruments */
 .gauge { position: absolute; z-index: 2; display: flex; align-items: flex-end; gap: calc(var(--g) * .05); pointer-events: none; color: #fff; }
 .gauge::before { content: ""; position: absolute; z-index: -1; inset: -32% -22% -18%; background: radial-gradient(closest-side, rgba(5,6,8,.72), rgba(5,6,8,0)); }
 .speedg { right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
 .battg { left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
-.dial { position: relative; width: var(--g); aspect-ratio: 1; flex: none; }
+.dial { position: relative; width: var(--g); aspect-ratio: 1; flex: none; container-type: inline-size; }
 .dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.gin { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; padding-top: 6%; }
-.dial .big { font-size: calc(var(--g) * .21); font-weight: 700; letter-spacing: -.035em; line-height: .92; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
-.dial .u { font-size: calc(var(--g) * .062); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.72); }
-.dial .sm { font-size: calc(var(--g) * .058); color: rgba(255,255,255,.62); margin-top: 2px; }
-.dial .mode { margin-top: calc(var(--g) * .03); font-size: calc(var(--g) * .052); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mode); }
+.gin { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; padding-top: 14%; }   /* below the top numbers */
+.dial .big { font-size: 17cqw; font-weight: 700; letter-spacing: -.035em; line-height: .92; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
+.dial .u { font-size: max(8px, 4.6cqw); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.72); }
+.dial .sm { font-size: max(9px, 4.8cqw); color: rgba(255,255,255,.62); margin-top: 2px; }
+.dial .mode { margin-top: 1.5cqw; font-size: max(8px, 4.4cqw); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mode); }
 .dial .trk { fill: none; stroke: rgba(255,255,255,.13); stroke-linecap: round; }
 .dial .val { fill: none; stroke: var(--mode); stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .22s linear, stroke .3s;
   filter: drop-shadow(0 0 6px rgba(var(--mode-rgb),.55)); }
@@ -185,22 +185,8 @@ body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opa
 .dial .red { fill: none; stroke: rgba(255,69,58,.85); }
 .dial .tick { stroke: rgba(255,255,255,.62); stroke-width: 2; } .dial .tick.minor { stroke: rgba(255,255,255,.3); stroke-width: 1.4; }
 .dial text { fill: rgba(255,255,255,.75); font: 600 13px var(--font); text-anchor: middle; dominant-baseline: middle; }
-.kwdial { width: calc(var(--g) * .46); margin-bottom: calc(var(--g) * .02); }
-.kwdial .big { font-size: calc(var(--g) * .1); }
-.kwdial .u { font-size: calc(var(--g) * .045); }
-.socbar { display: grid; justify-items: center; gap: 4px; width: calc(var(--g) * .16); margin-bottom: calc(var(--g) * .06); }
-.socbar .tube { position: relative; width: calc(var(--g) * .07); height: calc(var(--g) * .62); border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
-.socbar .tube > i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; border-radius: 999px; background: #2fbf4a; transition: height .4s, background-color .4s; }
-.socbar .pct { font-size: calc(var(--g) * .075); font-weight: 700; }
-.socbar .pct small { font-size: .6em; color: rgba(255,255,255,.65); }
-.socbar .ico { width: calc(var(--g) * .08); height: calc(var(--g) * .08); color: rgba(255,255,255,.7); }
-.battg .dial { width: calc(var(--g) * .82); }
-.battg .big { font-size: calc(var(--g) * .19); }
-.battg .sm { display: none; }                                     /* the cell range sits beside the dial when there is room */
-.battinfo { display: grid; gap: calc(var(--g) * .02); margin-bottom: calc(var(--g) * .12); font-size: calc(var(--g) * .058); }
-.battinfo div { display: flex; flex-direction: column; }
-.battinfo span { color: rgba(255,255,255,.6); font-size: .86em; }
-.battinfo b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dial .big small { font-size: .42em; font-weight: 600; letter-spacing: 0; margin-left: 1px; color: rgba(255,255,255,.7); }
+.kwdial { width: calc(var(--g) * .62); margin-bottom: calc(var(--g) * .02); }
 
 /* mini map: round, north-up, edges fading into the stage; the arrow in the middle is the kart */
 .minimap { position: absolute; z-index: 2; top: calc(8px + env(safe-area-inset-top, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
@@ -215,9 +201,6 @@ body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opa
 .mm-n { position: absolute; z-index: 650; top: 9%; left: 50%; transform: translateX(-50%); font: 700 11px var(--font); color: #ff8a1f; pointer-events: none; text-shadow: 0 1px 4px #000; }
 .mm-note { position: absolute; z-index: 650; inset: 0; display: grid; place-items: center; font-size: 12px; color: rgba(255,255,255,.6); pointer-events: none; }
 
-.khint { position: absolute; z-index: 2; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); margin: 0;
-  font-size: 12px; color: rgba(255,255,255,.62); white-space: nowrap; pointer-events: none; text-shadow: 0 1px 6px #000; }
-.kartwrap:not(.has3d) ~ .khint, .kartwrap.split ~ .khint { display: none; }
 
 /* split view: labels, lines, close button, hold ring */
 .klabels { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none; transition: opacity .2s; }
@@ -349,12 +332,9 @@ body.sheet-open .sheet { transform: none; }
 /* phone upright: smaller dials, the power dial and battery details step aside, the car sits between the map and the dials */
 @media (max-aspect-ratio: 1/1) {
   .stage { --g: clamp(112px, 31vw, 160px); }
-  .kwdial, .battinfo { display: none; }
-  .battg .dial { width: calc(var(--g) * .9); }
-  .battg .sm { display: block; }
+  .kwdial { display: none; }
   .minimap { width: clamp(140px, 44vw, 220px); }
   .carsafe { left: 2vw; right: 2vw; top: calc(clamp(140px, 44vw, 220px) + 4px + env(safe-area-inset-top, 0px)); bottom: calc(var(--g) + 28px); }
-  .khint { bottom: calc(var(--g) + 20px); }
   .timebox { left: max(12px, env(safe-area-inset-left, 0px)); transform: none; top: calc(62px + env(safe-area-inset-top, 0px)); justify-items: start; }
   body:not([data-tab="drive"]) .timebox { left: auto; right: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); justify-items: end; }
   body:not([data-tab="drive"]) .brand { display: none; }
@@ -362,10 +342,9 @@ body.sheet-open .sheet { transform: none; }
 }
 /* short screens (phone sideways): tighter instruments */
 @media (min-aspect-ratio: 1/1) and (max-height: 520px) {
-  .stage { --g: clamp(108px, 34vh, 172px); }
+  .stage { --g: clamp(118px, 39vh, 180px); }
   .minimap { width: clamp(130px, 46vh, 230px); }
   .carsafe { top: calc(40px + env(safe-area-inset-top, 0px)); bottom: calc(var(--g) * .28); left: calc(var(--g) * .55); right: calc(var(--g) * .55); }
-  .khint { display: none; }
   .view:not(.drive) { padding-top: calc(86px + env(safe-area-inset-top, 0px)); }
 }
 /* wide screens: the side sheet replaces the bottom sheet */
@@ -458,19 +437,18 @@ body.sheet-open .sheet { transform: none; }
           <span class="mm-note" id="mmNote">No GPS yet</span>
         </div>
 
+        <div class="gauge battg" role="group" aria-label="Battery">
+          <div class="dial" id="socDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
+            <div class="gin"><span class="big num"><span id="soc">--</span><small>%</small></span><span class="u">battery</span>
+              <span class="sm num" id="battLine">--</span><span class="sm num" id="rangeTxt">--</span></div></div>
+        </div>
         <div class="gauge speedg" role="group" aria-label="Speed, power and charge">
           <div class="dial kwdial" id="kwDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
             <div class="gin"><span class="big num" id="kw">--</span><span class="u">kW</span></div></div>
           <div class="dial" id="speedDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
             <div class="gin"><span class="big num" id="kmh">--</span><span class="u">km/h</span><span class="sm num" id="rpm">-- rpm</span><span class="mode" id="modeTxt"></span></div></div>
-          <div class="socbar" aria-label="Battery charge">
-            <span class="pct num"><span id="soc">--</span><small>%</small></span>
-            <div class="tube"><i id="socFill"></i></div>
-            <svg class="ico" aria-hidden="true"><use href="#i-batt"/></svg>
-          </div>
         </div>
 
-        <p class="khint" id="kHint">Tap the kart for the driver's view · hold it to see its parts</p>
       </div>
     </section>
 
@@ -578,7 +556,7 @@ const MC_FAULT = ["Overcurrent", "Bus overvoltage", "Bus undervoltage", "Motor o
 const MC_STATE = ["Booting", "Safety loop open", "Precharging", "HV ready", "Driving", "Fault"];
 const MODES = ["Eco", "Normal", "Sport"], LAMPS = ["Auto", "On", "Off"];
 // display ranges (estimates, tune on the kart)
-const RPM_MAX = 7000, RPM_RED = 6000, KW_MAX = 70, KW_MIN = -15, V_MIN = 290, V_MAX = 383, NOMINAL_V = 336, DEFAULT_AH = 40, DEFAULT_WH_KM = 90;
+const RPM_MAX = 12000, RPM_RED = 11000, KW_MAX = 70, KW_MIN = -15, V_MIN = 290, V_MAX = 383, NOMINAL_V = 336, DEFAULT_AH = 40, DEFAULT_WH_KM = 90;
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -627,14 +605,16 @@ function arcPath(f0, f1, r = 84) {
   const [x0, y0] = p(f0), [x1, y1] = p(f1), big = Math.abs(f1 - f0) * SWEEP > 180 ? 1 : 0, cw = f1 > f0 ? 1 : 0;
   return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 ${big} ${cw} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
 }
-function buildDial(id, { min, max, major, minor, label = v => v, red, zero, ends }) {
+function buildDial(id, { min, max, major, minor, label = v => v, red, low, zero, ends }) {
   const f = v => (v - min) / (max - min);
   let h = `<path class="trk" d="${arcPath(0, 1)}" stroke-width="9"/>`;
   if (red != null) h += `<path class="red" d="${arcPath(f(red), 1)}" stroke-width="9"/>`;
+  if (low != null) h += `<path class="red" d="${arcPath(0, f(low))}" stroke-width="9"/>`;            // low end in red (battery)
   for (let v = min; v <= max + 1e-6; v += minor) {
     const a = (ARC0 - SWEEP * f(v)) * Math.PI / 180, mj = Math.abs(((v - min) / major) - Math.round((v - min) / major)) < 1e-6, r0 = 74, r1 = mj ? 64 : 69;
     h += `<line class="tick${mj ? "" : " minor"}" x1="${(100 + r0 * Math.cos(a)).toFixed(1)}" y1="${(100 - r0 * Math.sin(a)).toFixed(1)}" x2="${(100 + r1 * Math.cos(a)).toFixed(1)}" y2="${(100 - r1 * Math.sin(a)).toFixed(1)}"/>`;
-    if (mj && (!ends || v === min || v + major > max + 1e-6)) h += `<text x="${(100 + 52 * Math.cos(a)).toFixed(1)}" y="${(100 - 52 * Math.sin(a)).toFixed(1)}">${label(v)}</text>`;
+    const end = Math.abs(v - min) < 1e-6 || Math.abs(v - max) < 1e-6, lr = end ? 101 : 52;      // end numbers sit outside the arc tips, keeping the middle free
+    if (mj && (!ends || end)) h += `<text x="${(100 + lr * Math.cos(a)).toFixed(1)}" y="${(100 - lr * Math.sin(a)).toFixed(1)}">${label(v)}</text>`;
   }
   if (zero != null) h += `<path class="val" id="${id}V" d="${arcPath(f(zero), 1)}" pathLength="100" stroke-width="9"/><path class="val regen" id="${id}R" d="${arcPath(f(zero), 0)}" pathLength="100" stroke-width="9"/>`;
   else h += `<path class="val" id="${id}V" d="${arcPath(0, 1)}" pathLength="100" stroke-width="9"/>`;
@@ -707,13 +687,15 @@ function render(s) {
   $("kw").textContent = fmt(s.kw, 1);
   const kw = fin(s.kw) ? s.kw : 0;
   setArc("kwDialV", kw > 0 ? kw / KWD[1] : 0); setArc("kwDialR", kw < 0 ? kw / KWD[0] : 0);
-  // charge bar
+  // battery dial: charge 0-100 %, coloured by level; pack voltage, battery temperature and range under it
   $("soc").textContent = fmt(s.soc, 0);
-  const sf = $("socFill"); sf.style.height = fin(s.soc) ? clamp01(s.soc / 100) * 100 + "%" : "0";
-  sf.style.backgroundColor = !fin(s.soc) ? "" : s.soc < 10 ? "#ff453a" : s.soc < 20 ? "#ffd60a" : "#2fbf4a";
+  setArc("socDialV", fin(s.soc) ? s.soc / 100 : 0);
+  $("socDialV").style.stroke = !fin(s.soc) ? "" : s.soc < 10 ? "#ff453a" : s.soc < 20 ? "#ffd60a" : "#2fbf4a";
+  $("battLine").textContent = `${fmt(s.v, 0)} V · ${fmt(s.tBatt, 0)}°`;
   // range estimate from charge, pack size and recent consumption (the dashboard shows it)
   const ah = parseFloat(store.get("packAh", "")) || DEFAULT_AH, wk = whPerKm();
   rangeKm = fin(s.soc) ? s.soc / 100 * NOMINAL_V * ah / (wk || DEFAULT_WH_KM) : null;
+  $("rangeTxt").textContent = fin(rangeKm) ? `~${fmt(rangeKm, rangeKm < 10 ? 1 : 0)} km` : "-- km";
 
   // faults
   const list = [], has = b => !!(s.faults & (1 << b)), mcHas = b => !!(s.mcFault & (1 << b));
@@ -885,7 +867,6 @@ function openPart(p) {
 // tapping the kart (3D or the flat view) or the minimap opens the full dashboard (hud.js)
 $("kart").addEventListener("click", e => { const z = e.target.closest("[data-part]"); if (z) openPart(z.dataset.part); });   // flat view
 window.addEventListener("kartpart", e => openPart(e.detail));                                                     // 3D view, split apart
-if (store.get("kartSplitSeen", "")) $("kHint").hidden = true;
 $("miniMap").addEventListener("click", () => window.openMapFull && openMapFull());
 $("miniMap").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && window.openMapFull) { e.preventDefault(); openMapFull(); } });
 function partInfo(p, s) {
@@ -1124,7 +1105,8 @@ document.addEventListener("click", () => {
     document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
 }, true);
 // dials
-buildDial("speedDial", { min: 0, max: RPM_MAX, major: 1000, minor: 500, label: v => v / 1000, red: RPM_RED });
+buildDial("speedDial", { min: 0, max: RPM_MAX, major: 2000, minor: 1000, label: v => v / 1000, red: RPM_RED });
+buildDial("socDial", { min: 0, max: 100, major: 20, minor: 10, low: 10 });
 buildDial("kwDial", { min: KWD[0], max: KWD[1], major: 20, minor: 10, zero: 0 });
 try { if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
 showTab(store.get("tab", "drive")); syncControls(); lapUi();

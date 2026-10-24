@@ -161,15 +161,14 @@ const ARC = (cx, cy, r, a0, a1) => {                          // SVG arc from an
 function rpmSvg() {
   const cx = 150, cy = 130, r = 118, A = f => 210 - 240 * f, red = RPM_RED / RPM_MAX;
   let ticks = "";
-  for (let k = 0; k <= RPM_MAX / 500; k++) {
-    const f = k * 500 / RPM_MAX, a = A(f) * Math.PI / 180, major = k % 2 === 0, r0 = r - 12, r1 = r - (major ? 26 : 19);
+  for (let k = 0; k <= RPM_MAX / 1000; k++) {
+    const f = k * 1000 / RPM_MAX, a = A(f) * Math.PI / 180, major = k % 2 === 0, r0 = r - 12, r1 = r - (major ? 26 : 19);
     ticks += `<line class="tick${major ? "" : " minor"}" x1="${(cx + r0 * Math.cos(a)).toFixed(1)}" y1="${(cy - r0 * Math.sin(a)).toFixed(1)}" x2="${(cx + r1 * Math.cos(a)).toFixed(1)}" y2="${(cy - r1 * Math.sin(a)).toFixed(1)}"/>`;
-    if (major) ticks += `<text x="${(cx + (r - 40) * Math.cos(a)).toFixed(1)}" y="${(cy - (r - 40) * Math.sin(a)).toFixed(1)}">${k / 2}</text>`;
+    if (major) ticks += `<text x="${(cx + (r - 40) * Math.cos(a)).toFixed(1)}" y="${(cy - (r - 40) * Math.sin(a)).toFixed(1)}">${k}</text>`;
   }
   return `<svg class="rpmg" viewBox="0 0 300 195" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
     <path class="trk" d="${ARC(cx, cy, r, A(0), A(1))}"/><path class="red" d="${ARC(cx, cy, r, A(red), A(1))}"/>
-    <path class="val" id="hRpmArc" d="${ARC(cx, cy, r, A(0), A(1))}" pathLength="100"/>${ticks}
-    <text class="unit" x="150" y="188">RPM ×1000</text></svg>`;
+    <path class="val" id="hRpmArc" d="${ARC(cx, cy, r, A(0), A(1))}" pathLength="100"/>${ticks}</svg>`;
 }
 const AMP_MIN = -40, AMP_MAX = 160;
 function ampSvg() {
