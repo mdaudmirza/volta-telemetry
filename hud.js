@@ -236,7 +236,7 @@ function hudMarkup() {
 }
 
 // ---------- open / close ----------
-let hudMap = null, hudBuilt = false, hudTimer = null, locked = false;
+let hudMap = null, hudBuilt = false, hudTimer = null;
 function buildHud() {
   document.body.insertAdjacentHTML("beforeend", hudMarkup()); hudBuilt = true;
   $("hud").addEventListener("click", e => { const b = e.target.closest("[data-part]"); if (b) openPart(b.dataset.part); });
@@ -254,8 +254,6 @@ function openHud() {
   h.hidden = false; requestAnimationFrame(() => h.classList.add("open"));
   document.documentElement.style.overflow = "hidden";
   history.pushState({ hud: 1 }, "");
-  // the app is already full screen on phones; turn sideways too when the browser allows it (Chrome on Android does, iPhone browsers do not)
-  if (document.fullscreenElement && screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").then(() => { locked = true; }).catch(() => {});
   // the map is created after the fade-in, so it never competes with the transition for frames
   setTimeout(hudMapShow, 300);
   if (last) hudRender(last);
@@ -274,7 +272,6 @@ function closeHud(fromPop) {
   h.classList.remove("open"); setTimeout(() => { h.hidden = true; }, 250);
   document.documentElement.style.overflow = "";
   clearInterval(hudTimer);
-  if (locked) { try { screen.orientation.unlock(); } catch (e) {} locked = false; }
   if (window.kart3d && kart3d.home) kart3d.home();                              // camera back out of the driver's seat
   if (!fromPop && history.state && history.state.hud) history.back();
 }

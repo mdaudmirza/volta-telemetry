@@ -437,7 +437,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
       if (ghost !== ghosted) { ghosted = ghost; for (const m of comps.chassis.children) if (m.isMesh && m.userData.mat) { m.material = ghost ? ghostOf(m.userData.mat) : m.userData.mat; m.castShadow = !ghost && !!L.shadow; }
         for (const g of Object.values(comps)) for (const m of g.children) if (m.userData.cls === "seat") m.visible = !ghost; }   // seats step aside so the battery reads clearly
       need = true;
-      if (split === splitTo) busy = false;
+      if (split === splitTo) { busy = false; if (!splitTo) document.body.classList.remove("kart-split"); }   // back together: instruments return
     }
     if (pulse && t - lastPulse > 50) { lastPulse = t; applyState(t); }
     if (!need || document.hidden || !host.offsetParent) { lastFrame = 0; return; }
@@ -492,12 +492,10 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     items.sort((a, b) => a.ax - b.ax);
     const cols = [items.slice(0, Math.ceil(items.length / 2)), items.slice(Math.ceil(items.length / 2))];
     let svg = "";
-    // each column stays between what floats on its side: the top bar or the mini map above, the gauges below
-    const edge = (sel, k) => { const e = document.querySelector(sel), r = e && e.getBoundingClientRect(); return r && r.width ? r[k] - hr.top : null; };
-    const lims = [[edge(".hudbar", "bottom"), null], [edge("#miniMap", "bottom"), edge(".speedg .dial:not(.kwdial)", "top")]];
+    // the instruments step away while the kart is apart, so the labels can use the full height (clear of the close button)
     cols.forEach((col, side) => {
       col.sort((a, b) => a.ay - b.ay);
-      const [t0, b0] = lims[side], top = Math.max(60, t0 != null ? t0 + 22 : 0), bot = Math.min(h - 20, b0 != null ? b0 - 4 : h);
+      const top = 40, bot = h - 30;
       let y = top; for (const it of col) { it.y = Math.max(it.ay, y); y = it.y + gap; }
       let lim = bot; for (let j = col.length - 1; j >= 0; j--) { col[j].y = Math.max(top, Math.min(col[j].y, lim)); lim = col[j].y - gap; }
       for (const it of col) {
@@ -514,6 +512,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   function explode(on) {
     if (busy || !!splitTo === !!on) return;
     busy = true; selected = null;
+    if (on) document.body.classList.add("kart-split");                    // everything else steps away while the kart is apart
     view("all", false, () => {
       splitTo = on ? 1 : 0; done.hidden = !on; wrap.classList.toggle("split", on);
       for (const { b } of labelEls) b.tabIndex = on ? 0 : -1;

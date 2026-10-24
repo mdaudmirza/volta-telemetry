@@ -78,6 +78,11 @@ body:not([data-tab="drive"]) .hudbar { right: 0; padding-bottom: 8px; background
 .backbtn .ico { width: 22px; height: 22px; }
 body[data-tab="drive"] .backbtn { display: none; }
 .hudbar .status { align-self: center; }
+/* phones held upright get a cover: the app is laid out for landscape */
+.rotate { display: none; position: fixed; inset: 0; z-index: 60; place-content: center; justify-items: center; gap: 14px; background: #0b0c0e; color: #fff; text-align: center; }
+.rotate svg { width: 64px; height: 64px; fill: none; stroke: #ff8a1f; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.rotate p { margin: 0; font-size: 17px; font-weight: 600; }
+@media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) { .rotate { display: grid; } }
 /* time and date, top centre: full screen hides the phone's own status bar */
 .timebox { position: fixed; z-index: 21; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: grid; justify-items: center; pointer-events: none; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
@@ -224,7 +229,9 @@ body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opa
 .khold.go { animation: khold .5s linear forwards; }
 @property --p { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
 @keyframes khold { to { --p: 100%; } }
-.kartwrap.split ~ .gauge { opacity: .35; }
+/* kart apart: only the kart, its labels and the close button stay (a fault banner still shows) */
+body.kart-split .gauge, body.kart-split .minimap, body.kart-split .hudbar, body.kart-split .timebox { opacity: 0; pointer-events: none; }
+.hudbar, .timebox { transition: opacity .3s ease; }
 
 /* kart drawing (flat fallback) */
 .kart .shadow { fill: rgba(0,0,0,.5); }
@@ -400,6 +407,7 @@ body.sheet-open .sheet { transform: none; }
     <button class="status" id="chip" data-s="idle" type="button" aria-haspopup="dialog" aria-controls="sheet">
       <span class="dot" aria-hidden="true"></span><span id="chipText">Not connected</span><svg class="ico" aria-hidden="true"><use href="#i-chev"/></svg></button>
   </header>
+  <div class="rotate" aria-live="polite"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="16" y="6" width="16" height="30" rx="3"/><path d="M8 36a16 16 0 0 0 28 6M36 42l1-6-6 1"/></svg><p>Turn your phone sideways</p></div>
   <div class="timebox"><span class="clock num" id="clock">--:--</span><span class="datetxt" id="dateTxt"></span></div>
   <div class="topcenter">
     <div class="alert glass" id="alert" data-sev="none" role="status" aria-live="polite">
@@ -691,7 +699,7 @@ function render(s) {
   $("soc").textContent = fmt(s.soc, 0);
   setArc("socDialV", fin(s.soc) ? s.soc / 100 : 0);
   $("socDialV").style.stroke = !fin(s.soc) ? "" : s.soc < 10 ? "#ff453a" : s.soc < 20 ? "#ffd60a" : "#2fbf4a";
-  $("battLine").textContent = `${fmt(s.v, 0)} V · ${fmt(s.tBatt, 0)}°`;
+  $("battLine").textContent = `${fmt(s.v, 0)} V · ${fmt(s.tBatt, 0)} °C`;
   // range estimate from charge, pack size and recent consumption (the dashboard shows it)
   const ah = parseFloat(store.get("packAh", "")) || DEFAULT_AH, wk = whPerKm();
   rangeKm = fin(s.soc) ? s.soc / 100 * NOMINAL_V * ah / (wk || DEFAULT_WH_KM) : null;
@@ -1099,11 +1107,15 @@ function tickClock() {
 }
 tickClock(); setInterval(tickClock, 10000);
 // phones stay full screen: the installed app opens that way; in a browser tab the first tap enters it (browsers need a tap)
+// phones: full screen and locked sideways. Browsers allow the lock only in full screen or an installed app (Chrome on Android);
+// where it cannot lock (iPhone), a "turn your phone" cover asks for landscape instead.
 const wantFull = matchMedia("(pointer: coarse)").matches;
+const lockLandscape = () => { try { screen.orientation.lock("landscape").catch(() => {}); } catch (e) {} };
 document.addEventListener("click", () => {
   if (wantFull && document.fullscreenEnabled && !document.fullscreenElement && !matchMedia("(display-mode: fullscreen)").matches)
-    document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+    document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(lockLandscape).catch(() => {});
 }, true);
+if (wantFull) lockLandscape();                                              // installed app: works straight away
 // dials
 buildDial("speedDial", { min: 0, max: RPM_MAX, major: 2000, minor: 1000, label: v => v / 1000, red: RPM_RED });
 buildDial("socDial", { min: 0, max: 100, major: 20, minor: 10, low: 10 });
