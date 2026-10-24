@@ -1,5 +1,5 @@
 // kart3d.js : the 3D VOLTA kart that fills the Drive screen.
-// model/volta.glb (light) and model/volta-hi.glb (High) are the team website's model split into its CAD parts by ../model-build.mjs,
+// model/volta.glb is the team website's model split into its CAD parts by ../model-build.mjs,
 // one mesh per material (body, frame, rim, tyre, caliper, seat, metal), straightened and scaled to the frame below, with the
 // steering wheel moved to the right-hand seat. The kart is painted like the real one (matte charcoal, gunmetal tubes, red calipers,
 // PARCO decals) and tints part zones by live state.
@@ -27,7 +27,7 @@ const GROUND = -0.487;
 
 // ---- graphics levels ----
 const LEVELS = {
-  high:     { model: "model/volta-hi.glb", dpr: 2,   shadow: 2048, ao: true,  msaa: 4, physical: true },
+  high:     { model: "model/volta.glb",    dpr: 2,   shadow: 2048, ao: false, msaa: 0, physical: true },
   balanced: { model: "model/volta.glb",    dpr: 1.5, shadow: 1024, ao: false, msaa: 0, physical: true },
   smooth:   { model: "model/volta.glb",    dpr: 1,   shadow: 0,    ao: false, msaa: 0, physical: false },
 };
@@ -108,28 +108,23 @@ const wingTex = () => decal(1024, 256, (g, w, h) => { g.clearRect(0, 0, w, h); w
 
 function start(levelName) {
   let L = LEVELS[levelName];
-  const renderer = new THREE.WebGLRenderer({ antialias: !L.ao, alpha: false, powerPreference: "high-performance" });
+  const renderer = new THREE.WebGLRenderer({ antialias: !L.ao, alpha: true, powerPreference: "high-performance" });
   let dpr = Math.min(window.devicePixelRatio || 1, L.dpr);
   renderer.setPixelRatio(dpr);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   renderer.shadowMap.enabled = !!L.shadow; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   host.appendChild(renderer.domElement);
 
-  // dark studio: soft vignette background and a pool of light on the floor under the kart
-  const scene = new THREE.Scene();
-  scene.background = decal(512, 512, (g, w, h) => {
-    const r = g.createRadialGradient(w / 2, h * 0.58, 20, w / 2, h * 0.58, w * 0.75);
-    r.addColorStop(0, "#1c1f24"); r.addColorStop(0.55, "#101215"); r.addColorStop(1, "#060708"); g.fillStyle = r; g.fillRect(0, 0, w, h);
-  });
+  const scene = new THREE.Scene();                                        // transparent: the stage behind is the backdrop
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture; pmrem.dispose();
-  scene.environmentIntensity = 0.62;
-  const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(0.9, -1.3, 4.2);
+  scene.environmentIntensity = 0.6;
+  const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(1.6, -2.2, 3.4);
   if (L.shadow) { key.castShadow = true; key.shadow.mapSize.set(L.shadow, L.shadow);
     Object.assign(key.shadow.camera, { left: -2.2, right: 2.2, top: 2.2, bottom: -2.2, near: 0.5, far: 9 }); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.012; key.shadow.radius = 3; }
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xffb070, 0.95); rim.position.set(-2.5, 2.5, 1.6); scene.add(rim);    // warm back light, PARCO orange
+  const rim = new THREE.DirectionalLight(0xffb070, 0.9); rim.position.set(-2.5, 2.5, 1.6); scene.add(rim);    // warm back light, PARCO orange
   const fill = new THREE.DirectionalLight(0x9fc4ff, 0.5); fill.position.set(-2, -2, 1); scene.add(fill);
 
   const camera = new THREE.PerspectiveCamera(28, 1, 0.03, 60);
@@ -140,16 +135,12 @@ function start(levelName) {
   controls.target.set(0, 0.05, -0.2);
   controls.addEventListener("change", () => need = true);
 
-  // floor: real shadow, a soft contact blur, and a faint light pool so the kart sits on something
-  const floorTex = decal(256, 256, (g, w, h) => { const r = g.createRadialGradient(w / 2, h / 2, 2, w / 2, h / 2, w / 2);
-    r.addColorStop(0, "rgba(255,190,140,.10)"); r.addColorStop(.5, "rgba(255,255,255,.04)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, w, h); });
-  const pool = new THREE.Mesh(new THREE.PlaneGeometry(7, 7), new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, depthWrite: false }));
-  pool.position.z = GROUND - 0.001; scene.add(pool);
-  if (L.shadow) { const ground = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), new THREE.ShadowMaterial({ opacity: 0.3 }));
+  // floor: real shadow from the key light, plus a soft contact blur under the kart
+  if (L.shadow) { const ground = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.ShadowMaterial({ opacity: 0.38 }));
     ground.position.z = GROUND; ground.receiveShadow = true; scene.add(ground); }
   const sc = document.createElement("canvas"); sc.width = sc.height = 128;
   const sg = sc.getContext("2d"), grd = sg.createRadialGradient(64, 64, 4, 64, 64, 64);
-  grd.addColorStop(0, "rgba(0,0,0,.7)"); grd.addColorStop(.6, "rgba(0,0,0,.25)"); grd.addColorStop(1, "rgba(0,0,0,0)"); sg.fillStyle = grd; sg.fillRect(0, 0, 128, 128);
+  grd.addColorStop(0, "rgba(0,0,0,.6)"); grd.addColorStop(.6, "rgba(0,0,0,.22)"); grd.addColorStop(1, "rgba(0,0,0,0)"); sg.fillStyle = grd; sg.fillRect(0, 0, 128, 128);
   const contact = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 3.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }));
   contact.position.z = GROUND + 0.002; scene.add(contact);
 
@@ -168,13 +159,13 @@ function start(levelName) {
   }
   setupComposer();
 
-  // headlamps: two glows and faint beams, shown when the lamp setting is On
+  // headlamps: the lamps themselves glow (no beams); brighter with a soft halo when the lamp setting is On
   const glowMat = new THREE.MeshBasicMaterial({ color: 0xfff4d6, transparent: true, opacity: 0, depthWrite: false });
-  const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff4d6, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const haloMat = new THREE.MeshBasicMaterial({ color: 0xfff4d6, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
   const lamps = new THREE.Group();
   for (const sx of [-1, 1]) {
     const g = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 12), glowMat); g.position.set(0.13 * sx, -1.36, -0.15); lamps.add(g);
-    const b = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.0, 24, 1, true), beamMat); b.rotation.x = -0.08; b.position.set(0.13 * sx, -1.86, -0.19); lamps.add(b);
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), haloMat); h.position.copy(g.position); lamps.add(h);
   }
 
   // ---- materials (colours from the kart photo) ----
@@ -256,7 +247,10 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   function addPart(g, cls, mat) {                                           // sort a non-indexed geometry's triangles into compartments
     const P = g.attributes.position.array, N = g.attributes.normal.array, n = P.length / 9, which = new Array(n), count = {};
     for (let t = 0; t < n; t++) {
-      const i = t * 9, c = compOf((P[i] + P[i + 3] + P[i + 6]) / 3, (P[i + 1] + P[i + 4] + P[i + 7]) / 3, (P[i + 2] + P[i + 5] + P[i + 8]) / 3, cls);
+      const i = t * 9, z0 = P[i + 2], z1 = P[i + 5], z2 = P[i + 8];
+      // drop the flat floor pan under the seats (1.3 x 1.9 m): it reads as a black slab, worst in the split view
+      if (cls === "body" && Math.max(z0, z1, z2) < -0.3 && Math.min(z0, z1, z2) > -0.35 && Math.max(z0, z1, z2) - Math.min(z0, z1, z2) < 0.006) { which[t] = null; continue; }
+      const c = compOf((P[i] + P[i + 3] + P[i + 6]) / 3, (P[i + 1] + P[i + 4] + P[i + 7]) / 3, (P[i + 2] + P[i + 5] + P[i + 8]) / 3, cls);
       which[t] = c; count[c] = (count[c] || 0) + 1;
     }
     for (const c of Object.keys(count)) {
@@ -363,18 +357,18 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     hose([[-0.21, RAD.y, RAD.z + 0.1], [-0.18, 1.0, 0.06], [-0.12, CTRL.y + 0.05, CTRL.z + 0.06]]);            // radiator -> controller cold plate
     return g;
   }
-  // driver's dash screen in front of the right-hand seat (the driver sits on the right in Pakistan); the tap transition flies into it
-  const EYE = new THREE.Vector3(-0.2, 0.2, 0.42), DASH = new THREE.Vector3(-0.2, -0.42, 0.205);
+  // driver's screen on the flap right above the steering wheel (right-hand seat: the driver sits on the right in Pakistan); the tap transition flies into it
+  const EYE = new THREE.Vector3(-0.2, 0.2, 0.42), DASH = new THREE.Vector3(-0.198, -0.268, 0.192);
   function makeDash() {
-    const tex = decal(512, 256, (c, W, H) => {
+    const tex = decal(512, 320, (c, W, H) => {
       c.fillStyle = "#121417"; c.fillRect(0, 0, W, H); c.strokeStyle = "#ff8a1f"; c.lineWidth = 6; c.strokeRect(8, 8, W - 16, H - 16);
-      c.lineWidth = 14; c.strokeStyle = "#24272b"; c.beginPath(); c.arc(W / 2, 170, 110, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
-      c.strokeStyle = "#ff8a1f"; c.beginPath(); c.arc(W / 2, 170, 110, Math.PI * 1.1, Math.PI * 1.55); c.stroke();
-      c.fillStyle = "#ffffff"; c.font = "800 60px Inter, Arial, sans-serif"; c.textAlign = "center"; c.fillText("VOLTA", W / 2, 190);
-      c.fillStyle = "#2fbf4a"; c.font = "600 22px Inter, Arial, sans-serif"; c.fillText("DRIVER DISPLAY", W / 2, 225);
+      c.lineWidth = 14; c.strokeStyle = "#24272b"; c.beginPath(); c.arc(W / 2, 200, 120, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+      c.strokeStyle = "#ff8a1f"; c.beginPath(); c.arc(W / 2, 200, 120, Math.PI * 1.1, Math.PI * 1.55); c.stroke();
+      c.fillStyle = "#ffffff"; c.font = "800 60px Inter, Arial, sans-serif"; c.textAlign = "center"; c.fillText("VOLTA", W / 2, 222);
+      c.fillStyle = "#2fbf4a"; c.font = "600 22px Inter, Arial, sans-serif"; c.fillText("DRIVER DISPLAY", W / 2, 262);
     });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.1), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
-    m.position.copy(DASH); m.rotation.set(-1.25, 0, Math.PI);                  // faces the driver (+y), tilted back, upright
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.05), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+    m.position.copy(DASH); m.up.set(0, 0, 1); m.lookAt(DASH.x, DASH.y + 1, DASH.z);   // upright, facing the driver
     return m;
   }
 
@@ -424,7 +418,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
       U.uZCol.value[i].copy(col); U.uZStr.value[i] = str;
     });
     const on = state && state.lamp === 1, auto = state && state.lamp === 0;
-    glowMat.opacity = on ? 1 : auto ? 0.35 : 0.08; beamMat.opacity = on ? 0.05 : 0;
+    glowMat.opacity = on ? 1 : auto ? 0.35 : 0.08; haloMat.opacity = on ? 0.28 : 0;
     need = true;
   }
 
@@ -525,7 +519,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     const r = renderer.domElement.getBoundingClientRect();
     ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    return ray.intersectObject(kart, true).filter(h => h.object.visible && h.object.isMesh && h.object.material !== glowMat && h.object.material !== beamMat);
+    return ray.intersectObject(kart, true).filter(h => h.object.visible && h.object.isMesh && h.object.material !== glowMat && h.object.material !== haloMat);
   }
   const cancelHold = () => { clearTimeout(holdTimer); ring.hidden = true; };
   renderer.domElement.addEventListener("contextmenu", e => e.preventDefault());   // no long-press menu on phones
@@ -553,7 +547,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   function driverView() {
     if (reduceMotion) { window.dispatchEvent(new CustomEvent("kartopen")); return; }
     tween = null;
-    const p0 = camera.position.clone(), p3 = DASH.clone().add(new THREE.Vector3(0, 0.06, 0.075));
+    const p0 = camera.position.clone(), p3 = DASH.clone().add(new THREE.Vector3(0, 0.12, 0.012));
     const p1 = EYE.clone().add(new THREE.Vector3(0, 0.45, 0.95)), p2 = EYE.clone();
     flight = { t0: performance.now(), dur: 760, p0, p1, p2, p3, tFrom: controls.target.clone(), opened: false };
     wrap.classList.add("flying"); window.dispatchEvent(new CustomEvent("kartopening"));
