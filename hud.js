@@ -1,14 +1,44 @@
 // hud.js : the full-screen dashboard from the team's reference image (opened by tapping the kart), plus the live maps.
 // Uses app.html's globals: $, fmt, fin, last, track, lastFix, lapTrack, lapStart, lapNo, best, lastLapMs, markLap, openPart, openId, zoneState,
 // LIMITS, TEMPS, FAULT_TEXT, MC_FAULT, CRIT_MASK, MODES, RPM_MAX, RPM_RED, KW_MIN, KW_MAX, V_MIN, V_MAX.
-// Maps: Leaflet with OpenStreetMap tiles (free, no key; the dark look is a CSS filter). Tiles need internet; the service worker keeps
-// the ones you have seen. OSM asks for light use and visible attribution: fine for a team app, not for a public site with many users.
+// Maps: Leaflet with OpenStreetMap tiles (free, no key; the dark look is a CSS filter); the service worker keeps the tiles you have seen.
+// Google Maps (dark style) is ready too: put a key in GMAPS_KEY and every map switches to it, falling back to OSM if Google cannot load.
 "use strict";
 
 // ---------- maps ----------
 const MAP_HOME = [34.0698, 72.6444];                       // GIKI, Topi: shown until the kart has a GPS fix
 const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
+// Browser key for the Maps JavaScript API; empty = OpenStreetMap only. A key is visible to anyone who opens the app, so before adding
+// one restrict it in Google Cloud to HTTP referrers https://mdaudmirza.github.io/* and http://localhost:*/*, to the Maps JavaScript API
+// only, and cap its daily map loads.
+const GMAPS_KEY = "";
+const GDARK = [                                              // graphite like the app, PARCO orange only on the kart and the lap line
+  { elementType: "geometry", stylers: [{ color: "#1c1f23" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8d929b" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#121417" }] },
+  { elementType: "labels.icon", stylers: [{ saturation: -100 }, { lightness: -35 }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#2c3036" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#25292f" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#22262b" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#1a2a1f" }] },
+  { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#353a42" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#16181b" }] },
+  { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#4a4339" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e1822" }] },
+];
+let mapKind = "leaflet";
+const mapsReady = new Promise(res => {
+  let settled = false; const done = k => { if (settled) return; settled = true; mapKind = k; res(); };
+  if (!GMAPS_KEY || !navigator.onLine) return done("leaflet");
+  window.gm_authFailure = () => { if (mapKind === "google") { mapKind = "leaflet"; remakeMaps(); } else done("leaflet"); };   // key refused
+  window.__gmReady = () => Promise.all([google.maps.importLibrary("maps"), google.maps.importLibrary("marker")]).then(() => done("google"), () => done("leaflet"));
+  const sc = document.createElement("script"); sc.async = true; sc.onerror = () => done("leaflet");
+  sc.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&v=weekly&loading=async&callback=__gmReady`;
+  document.head.appendChild(sc);
+  setTimeout(() => done("leaflet"), 8000);                   // slow network: use OSM rather than wait
+});
 const KART_ICON = '<svg width="28" height="28" viewBox="-14 -14 28 28"><g class="rot"><path d="M0 -12 L9 10 L0 5 L-9 10 Z" fill="#ff8a1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></g></svg>';
 let heading = 0;
 
@@ -25,7 +55,39 @@ function updateHeading() {                                    // from the last G
 
 // Every map shows the kart where it is; the track line appears only while a lap is being timed and starts over every lap.
 // mini: the round Drive-screen map, north-up, always centred on the kart, no gestures (the arrow over it is drawn in app.html)
-function makeMap(el, { theme = "dark", follow = true, mini = false } = {}) {
+// Each map offers: update(), zoomIn(), zoomOut(), fitLap(pad), resize(), setTheme(t), destroy(), plus follow / fitted / onFollow.
+function makeMap(el, opts = {}) { return mapKind === "google" ? makeGoogleMap(el, opts) : makeLeafletMap(el, opts); }
+
+function makeGoogleMap(el, { theme = "dark", follow = true, mini = false } = {}) {
+  const g = google.maps, ll = p => ({ lat: p[0], lng: p[1] });
+  const map = new g.Map(el, { center: ll(MAP_HOME), zoom: 17, minZoom: 3, maxZoom: 20, disableDefaultUI: true, clickableIcons: false,
+    keyboardShortcuts: !mini, gestureHandling: mini ? "none" : "greedy", backgroundColor: "#0b0c0e", styles: theme === "dark" ? GDARK : [] });
+  const line = new g.Polyline({ map, strokeColor: "#ff8a1f", strokeOpacity: .95, strokeWeight: mini ? 3 : 3.5, clickable: false });
+  const start = new g.Marker({ clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 5, fillColor: "#2fbf4a", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 } });
+  const kartIcon = { path: "M0 -12 L9 10 L0 5 L-9 10 Z", fillColor: "#ff8a1f", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.6, scale: 1, anchor: new g.Point(0, 0), rotation: 0 };
+  const kart = new g.Marker({ clickable: false, icon: kartIcon });
+  const m = { follow, fitted: false };
+  map.addListener("dragstart", () => { m.follow = false; m.onFollow && m.onFollow(false); });
+  const fit = (pts, pad) => { const b = new g.LatLngBounds(); for (const p of pts) b.extend(ll(p)); map.fitBounds(b, pad);
+    g.event.addListenerOnce(map, "idle", () => { if (map.getZoom() > 18) map.setZoom(18); }); };
+  m.update = () => {
+    const lap = lapStart ? lapTrack : [];
+    line.setPath(lap.map(ll));
+    if (lap.length && !mini) { start.setPosition(ll(lap[0])); if (!start.getMap()) start.setMap(map); } else if (start.getMap()) start.setMap(null);
+    if (!lastFix) { if (kart.getMap()) kart.setMap(null); return; }
+    if (!mini) { kartIcon.rotation = heading; kart.setIcon(kartIcon); kart.setPosition(ll(lastFix)); if (!kart.getMap()) kart.setMap(map); }
+    if (m.follow || mini) mini ? map.setCenter(ll(lastFix)) : map.panTo(ll(lastFix));
+    else if (!m.fitted && lap.length > 5) { fit(lap, 24); m.fitted = true; }
+  };
+  m.zoomIn = () => map.setZoom(map.getZoom() + 1); m.zoomOut = () => map.setZoom(map.getZoom() - 1);
+  m.fitLap = pad => fit(lapTrack, pad);
+  m.resize = () => {};                                       // Google watches its own size
+  m.setTheme = t => map.setOptions({ styles: t === "dark" ? GDARK : [] });
+  m.destroy = () => { line.setMap(null); start.setMap(null); kart.setMap(null); el.replaceChildren(); el.removeAttribute("style"); };
+  return m;
+}
+
+function makeLeafletMap(el, { theme = "dark", follow = true, mini = false } = {}) {
   const map = L.map(el, { zoomControl: false, attributionControl: !mini, zoomSnap: 0.5, minZoom: 3, maxZoom: 20, fadeAnimation: !mini,
     ...(mini ? { dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false } : {}) }).setView(MAP_HOME, 17);
   if (!mini) map.attributionControl.setPrefix(false);                        // the mini map's credit is in Settings > About
@@ -33,7 +95,7 @@ function makeMap(el, { theme = "dark", follow = true, mini = false } = {}) {
   const line = L.polyline([], { color: "#ff8a1f", weight: mini ? 3 : 3.5, opacity: .95, className: "trackline", interactive: false }).addTo(map);
   const start = L.circleMarker(MAP_HOME, { radius: 5, color: "#fff", weight: 2, fillColor: "#2fbf4a", fillOpacity: 1, interactive: false });
   const kart = L.marker(MAP_HOME, { icon: L.divIcon({ className: "kartmk", html: KART_ICON, iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false, keyboard: false });
-  const m = { map, follow, fitted: false, setTheme(t) { tiles.getContainer().classList.toggle("tiles-dark", t === "dark"); } };
+  const m = { follow, fitted: false };
   map.on("dragstart", () => { m.follow = false; m.onFollow && m.onFollow(false); });
   m.update = () => {
     const lap = lapStart ? lapTrack : [];
@@ -47,26 +109,46 @@ function makeMap(el, { theme = "dark", follow = true, mini = false } = {}) {
     if (m.follow || mini) map.panTo(lastFix, { animate: !mini, duration: 0.45 });
     else if (!m.fitted && lap.length > 5) { map.fitBounds(line.getBounds(), { padding: [24, 24], maxZoom: 18 }); m.fitted = true; }
   };
+  m.zoomIn = () => map.zoomIn(); m.zoomOut = () => map.zoomOut();
+  m.fitLap = pad => map.fitBounds(L.latLngBounds(lapTrack), { padding: [pad, pad], maxZoom: 18 });
+  m.resize = () => map.invalidateSize();
+  m.setTheme = t => tiles.getContainer().classList.toggle("tiles-dark", t === "dark");
+  m.destroy = () => map.remove();
   return m;
+}
+const mapsAvailable = () => mapKind === "google" || typeof L !== "undefined";
+
+// Google refused the key after the maps were made: rebuild whichever maps are on screen with OpenStreetMap
+function remakeMaps() {
+  for (const m of [miniMap, lapsMap, hudMap, fullMap]) if (m) m.destroy();
+  miniMap = lapsMap = hudMap = fullMap = null;
+  if (!$("view-drive").hidden) miniMapShow();
+  if (!$("view-laps").hidden) lapsMapShow();
+  if ($("hud") && !$("hud").hidden) hudMapShow();
+  if ($("mapFull") && !$("mapFull").hidden) fullMapShow();
 }
 
 // Drive screen: the round mini map in the top-right corner
 let miniMap = null;
 function miniMapShow() {
-  const el = $("miniMapCanvas"); if (!el || typeof L === "undefined") return;
-  if (!miniMap) miniMap = makeMap(el, { mini: true });
-  setTimeout(() => { miniMap.map.invalidateSize(); miniMap.update(); }, 0);
+  mapsReady.then(() => {
+    const el = $("miniMapCanvas"); if (!el || !mapsAvailable()) return;
+    if (!miniMap) miniMap = makeMap(el, { mini: true });
+    setTimeout(() => { miniMap.resize(); miniMap.update(); }, 0);
+  });
 }
 window.miniMapShow = miniMapShow;
-window.addEventListener("resize", () => { if (miniMap) miniMap.map.invalidateSize(); });
+window.addEventListener("resize", () => { if (miniMap) miniMap.resize(); });
 
 // Laps tab: whole-session map, follows the theme
 let lapsMap = null;
 const pageTheme = () => matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 function lapsMapShow() {
-  const el = $("lapMap"); if (!el || typeof L === "undefined") return;
-  if (!lapsMap) { lapsMap = makeMap(el, { theme: pageTheme(), follow: false }); matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => lapsMap.setTheme(pageTheme())); }
-  setTimeout(() => { lapsMap.map.invalidateSize(); lapsMap.fitted = false; lapsMap.update(); }, 0);
+  mapsReady.then(() => {
+    const el = $("lapMap"); if (!el || !mapsAvailable()) return;
+    if (!lapsMap) { lapsMap = makeMap(el, { theme: pageTheme(), follow: false }); matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => lapsMap && lapsMap.setTheme(pageTheme())); }
+    setTimeout(() => { lapsMap.resize(); lapsMap.fitted = false; lapsMap.update(); }, 0);
+  });
 }
 window.lapsMapShow = lapsMapShow;
 
@@ -161,9 +243,9 @@ function buildHud() {
   $("hud").addEventListener("click", e => { const b = e.target.closest("[data-part]"); if (b) openPart(b.dataset.part); });
   $("hudClose").onclick = () => closeHud();
   $("hLapBtn").onclick = () => markLap();
-  $("hZoomIn").onclick = () => hudMap && hudMap.map.zoomIn(); $("hZoomOut").onclick = () => hudMap && hudMap.map.zoomOut();
+  $("hZoomIn").onclick = () => hudMap && hudMap.zoomIn(); $("hZoomOut").onclick = () => hudMap && hudMap.zoomOut();
   $("hFollow").onclick = () => { if (!hudMap) return; hudMap.follow = !hudMap.follow; $("hFollow").setAttribute("aria-pressed", hudMap.follow); hudMap.update(); };
-  $("hFit").onclick = () => { if (!hudMap || lapTrack.length < 2) return; hudMap.follow = false; $("hFollow").setAttribute("aria-pressed", "false"); hudMap.map.fitBounds(L.latLngBounds(lapTrack), { padding: [30, 30], maxZoom: 18 }); };
+  $("hFit").onclick = () => { if (!hudMap || lapTrack.length < 2) return; hudMap.follow = false; $("hFollow").setAttribute("aria-pressed", "false"); hudMap.fitLap(30); };
   $("hBig").onclick = () => openMapFull();
   $("hKwZero").style.left = (-KW_MIN / (KW_MAX - KW_MIN) * 100) + "%";
 }
@@ -176,14 +258,17 @@ function openHud() {
   // the app is already full screen on phones; turn sideways too when the browser allows it (Chrome on Android does, iPhone browsers do not)
   if (document.fullscreenElement && screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").then(() => { locked = true; }).catch(() => {});
   // the map is created after the fade-in, so it never competes with the transition for frames
-  if (typeof L !== "undefined") setTimeout(() => {
-    if (!hudMap) { hudMap = makeMap($("hMap"), { theme: "dark", follow: true }); hudMap.onFollow = f => $("hFollow").setAttribute("aria-pressed", f); }
-    hudMap.map.invalidateSize(); hudMap.update();
-  }, 300);
-  else $("hMapNote").textContent = "Map unavailable";
+  setTimeout(hudMapShow, 300);
   if (last) hudRender(last);
   clearInterval(hudTimer); hudTimer = setInterval(hudTick, 100);
   $("hudClose").focus({ preventScroll: true });
+}
+function hudMapShow() {
+  mapsReady.then(() => {
+    if (!mapsAvailable()) { $("hMapNote").textContent = "Map unavailable"; return; }
+    if (!hudMap) { hudMap = makeMap($("hMap"), { theme: "dark", follow: true }); hudMap.onFollow = f => $("hFollow").setAttribute("aria-pressed", f); }
+    hudMap.resize(); hudMap.update();
+  });
 }
 function closeHud(fromPop) {
   const h = $("hud"); if (!h || h.hidden) return;
@@ -214,9 +299,9 @@ function buildMapFull() {
     <div class="mapnote" id="mfNote">Waiting for GPS fix</div>`;
   document.body.appendChild(d);
   $("mfBack").onclick = () => closeMapFull();
-  $("mfIn").onclick = () => fullMap && fullMap.map.zoomIn(); $("mfOut").onclick = () => fullMap && fullMap.map.zoomOut();
+  $("mfIn").onclick = () => fullMap && fullMap.zoomIn(); $("mfOut").onclick = () => fullMap && fullMap.zoomOut();
   $("mfFollow").onclick = () => { if (!fullMap) return; fullMap.follow = !fullMap.follow; $("mfFollow").setAttribute("aria-pressed", fullMap.follow); fullMap.update(); };
-  $("mfFit").onclick = () => { if (!fullMap || lapTrack.length < 2) return; fullMap.follow = false; $("mfFollow").setAttribute("aria-pressed", "false"); fullMap.map.fitBounds(L.latLngBounds(lapTrack), { padding: [40, 40], maxZoom: 18 }); };
+  $("mfFit").onclick = () => { if (!fullMap || lapTrack.length < 2) return; fullMap.follow = false; $("mfFollow").setAttribute("aria-pressed", "false"); fullMap.fitLap(40); };
 }
 function openMapFull() {
   if (!$("mapFull")) buildMapFull();
@@ -224,12 +309,15 @@ function openMapFull() {
   d.hidden = false; requestAnimationFrame(() => d.classList.add("open"));
   history.pushState({ mapfull: 1 }, "");
   $("mfNote").hidden = !!lastFix;
-  if (typeof L === "undefined") { $("mfNote").textContent = "Map unavailable"; return; }
-  setTimeout(() => {
-    if (!fullMap) { fullMap = makeMap($("mfMap"), { theme: "dark", follow: true }); fullMap.onFollow = f => $("mfFollow").setAttribute("aria-pressed", f); }
-    fullMap.map.invalidateSize(); fullMap.update();
-  }, 120);
+  setTimeout(fullMapShow, 120);
   $("mfBack").focus({ preventScroll: true });
+}
+function fullMapShow() {
+  mapsReady.then(() => {
+    if (!mapsAvailable()) { $("mfNote").hidden = false; $("mfNote").textContent = "Map unavailable"; return; }
+    if (!fullMap) { fullMap = makeMap($("mfMap"), { theme: "dark", follow: true }); fullMap.onFollow = f => $("mfFollow").setAttribute("aria-pressed", f); }
+    fullMap.resize(); fullMap.update();
+  });
 }
 function closeMapFull(fromPop) {
   const d = $("mapFull"); if (!d || d.hidden) return;

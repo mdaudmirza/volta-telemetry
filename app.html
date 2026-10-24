@@ -201,6 +201,7 @@ body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opa
   width: clamp(170px, 42vmin, 330px); aspect-ratio: 1; border-radius: 50%; cursor: pointer;
   -webkit-mask-image: radial-gradient(circle closest-side, #000 62%, rgba(0,0,0,.5) 82%, transparent 100%); mask-image: radial-gradient(circle closest-side, #000 62%, rgba(0,0,0,.5) 82%, transparent 100%); }
 .minimap .mm { position: absolute; inset: 0; background: transparent; }
+.minimap::after { content: ""; position: absolute; inset: 0; z-index: 700; border-radius: 50%; }   /* takes the tap (opens the full map) before the map can */
 .minimap .leaflet-container { background: transparent; }
 .minimap .leaflet-tile-pane { opacity: .82; }
 .mm-arrow { position: absolute; z-index: 650; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; pointer-events: none; transition: transform .3s linear;
