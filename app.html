@@ -176,7 +176,10 @@ body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opa
 .dial .big { font-size: 17cqw; font-weight: 700; letter-spacing: -.035em; line-height: .92; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
 .dial .u { font-size: max(8px, 4.6cqw); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.72); }
 .dial .sm { font-size: max(9px, 4.8cqw); color: rgba(255,255,255,.62); margin-top: 2px; }
-.dial .mode { margin-top: 1.5cqw; font-size: max(8px, 4.4cqw); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mode); }
+.dial .mode { margin: 1.5cqw -10px -6px; padding: 4px 10px 6px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-size: max(8px, 4.4cqw);
+  font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mode); cursor: pointer; pointer-events: auto; }   /* tap: next drive mode */
+.dial .mode:active { background: rgba(255,255,255,.12); }
+body:not([data-mode="eco"]):not([data-mode="sport"]) .dial .mode { color: rgba(255,255,255,.5); }   /* Normal: quiet, but still there to tap */
 .dial .trk { fill: none; stroke: rgba(255,255,255,.13); stroke-linecap: round; }
 .dial .val { fill: none; stroke: var(--mode); stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .22s linear, stroke .3s;
   filter: drop-shadow(0 0 6px rgba(var(--mode-rgb),.55)); }
@@ -448,7 +451,7 @@ body.sheet-open .sheet { transform: none; }
           <div class="dial kwdial" id="kwDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
             <div class="gin"><span class="big num" id="kw">--</span><span class="u">kW</span></div></div>
           <div class="dial" id="speedDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
-            <div class="gin"><span class="big num" id="kmh">--</span><span class="u">km/h</span><span class="sm num" id="rpm">-- rpm</span><span class="mode" id="modeTxt"></span></div></div>
+            <div class="gin"><span class="big num" id="kmh">--</span><span class="u">km/h</span><span class="sm num" id="rpm">-- rpm</span><button class="mode" id="modeTxt" type="button" aria-label="Drive mode. Tap to change"></button></div></div>
         </div>
 
       </div>
@@ -682,8 +685,8 @@ function render(s) {
   $("kmh").textContent = fmt(s.kmh, 0);
   $("rpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
   setArc("speedDialV", Math.abs(s.rpm || 0) / RPM_MAX); $("speedDialV").style.stroke = Math.abs(s.rpm || 0) >= RPM_RED ? "#ff453a" : "";
-  const md = s.mode === 0 ? "eco" : s.mode === 2 ? "sport" : "";                 // Normal shows nothing
-  $("modeTxt").textContent = md ? `${MODES[s.mode]} mode` : "";
+  const md = s.mode === 0 ? "eco" : s.mode === 2 ? "sport" : "";                 // Normal keeps the orange theme
+  $("modeTxt").textContent = fin(s.mode) && MODES[s.mode] ? `${MODES[s.mode]} mode` : "";
   if (document.body.dataset.mode !== md) document.body.dataset.mode = md;
   // power dial: drive (orange) from zero clockwise, regen (green) from zero anticlockwise
   $("kw").textContent = fmt(s.kw, 1);
@@ -961,6 +964,8 @@ function handleBleLine(line) {
   if (line === "ERR,PIN") { authed = false; syncControls(); toast("Wrong control PIN"); return; }
   if (line === "ERR,MOVING") { toast("Stop the kart before changing drive mode"); return; }
   if (line === "ERR,AUTH") { toast("Enter the control PIN in Settings first"); return; }
+  if (line.startsWith("OK,MODE,")) { toast("Drive mode: " + line.slice(8)); return; }
+  if (line.startsWith("OK,LAMP,")) { toast("Headlamps: " + line.slice(8)); return; }
   if (line.startsWith("OK,")) toast("Kart confirmed " + line.slice(3).replace(",", " "));
 }
 async function send(cmd) {
@@ -993,7 +998,7 @@ let demo = { mode: 0, lamp: 0 };
 function demoCmd(cmd) {
   const [c, v] = cmd.split(",");
   setTimeout(() => {
-    if (c === "MODE") { if (last && last.kmh > 2) return handleBleLine("ERR,MOVING"); demo.mode = +v; handleBleLine("OK,MODE," + MODES[+v]); }
+    if (c === "MODE") { demo.mode = +v; handleBleLine("OK,MODE," + MODES[+v]); }                // demo: any time (not a real kart)
     if (c === "LAMP") { demo.lamp = +v; handleBleLine("OK,LAMP," + LAMPS[+v]); }
   }, 150);
 }
@@ -1021,10 +1026,12 @@ $("btnDemo").onclick = () => {
 };
 
 // ---------- controls ----------
+// the real kart changes mode only when stopped (its firmware refuses otherwise); the demo allows it any time
+const kartMoving = () => source !== "demo" && !!last && ((fin(last.kmh) && last.kmh > 2) || (fin(last.rpm) && Math.abs(last.rpm) > 100));
 function syncControls() {
   const live = (source === "ble" && bleRx) || source === "demo";
   const ok = live && authed;
-  const moving = !!last && ((fin(last.kmh) && last.kmh > 2) || (fin(last.rpm) && Math.abs(last.rpm) > 100));
+  const moving = kartMoving();
   $("pinState").textContent = !live ? "Not connected" : ok ? (source === "demo" ? "Unlocked (demo)" : "Unlocked") : "Locked: check the PIN";
   $("ctlState").textContent = !live ? "Connect by Bluetooth to use the controls" : !ok ? "Enter the control PIN in Settings"
     : moving ? "Stop the kart to change mode" : source === "demo" ? "Demo, not a real kart" : "Controls unlocked";
@@ -1032,6 +1039,15 @@ function syncControls() {
     for (const b of $(segId).querySelectorAll("button")) { b.disabled = !ok || (key === "mode" && moving); b.setAttribute("aria-pressed", last && last[key] === +b.dataset.v ? "true" : "false"); }
 }
 $("segMode").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) send(`MODE,${b.dataset.v}`); };
+// tap the mode on the speed dial: Eco -> Normal -> Sport -> Eco
+$("modeTxt").onclick = () => {
+  const live = (source === "ble" && bleRx) || source === "demo";
+  if (!live) return toast("Connect to the kart to change the drive mode");
+  if (!authed) return toast("Enter the control PIN in Settings first");
+  if (kartMoving()) return toast("Stop the kart to change mode");
+  const cur = last && fin(last.mode) ? last.mode : 1;
+  send(`MODE,${(cur + 1) % 3}`);
+};
 $("segLamp").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) send(`LAMP,${b.dataset.v}`); };
 
 // ---------- laps + session ----------
