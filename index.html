@@ -138,7 +138,7 @@ body[data-tab="drive"] { overflow: hidden; color-scheme: dark;
   --fg: #ffffff; --fg2: #a3a7ae; --fg3: #5d6066; --card: #17191c; --card2: #24272b; --fill: rgba(130,134,142,.2);
   --glass: rgba(20,22,25,.62); --glass-line: rgba(255,255,255,.09); --accent: var(--mode); --on-accent: #000; --ok: #2fbf4a; --warn: #ffd60a; --crit: #ff453a; --shadow: rgba(0,0,0,.5); }
 .drive { position: fixed; inset: 0; }
-/* drive mode colours the instruments: Eco green, Sport red, Normal stays PARCO orange */
+/* drive mode colours the instruments: Eco green, Sport red, Drive stays PARCO orange */
 body { --mode: #ff8a1f; --mode-rgb: 255,138,31; }
 body[data-mode="eco"] { --mode: #2fbf4a; --mode-rgb: 47,191,74; }
 body[data-mode="sport"] { --mode: #ff3b30; --mode-rgb: 255,59,48; }
@@ -185,7 +185,7 @@ body[data-mode="eco"] .stage::after, body[data-mode="sport"] .stage::after { opa
 .dial .mode { margin: 1.5cqw -10px -6px; padding: 4px 10px 6px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-size: max(8px, 4.4cqw);
   font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mode); cursor: pointer; pointer-events: auto; }   /* tap: next drive mode */
 .dial .mode:active { background: rgba(255,255,255,.12); }
-body:not([data-mode="eco"]):not([data-mode="sport"]) .dial .mode { color: rgba(255,255,255,.5); }   /* Normal: quiet, but still there to tap */
+body:not([data-mode="eco"]):not([data-mode="sport"]) .dial .mode { color: rgba(255,255,255,.5); }   /* Drive: quiet, but still there to tap */
 .dial .trk { fill: none; stroke: rgba(255,255,255,.13); stroke-linecap: round; }
 .dial .val { fill: none; stroke: var(--mode); stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset .22s linear, stroke .3s;
   filter: drop-shadow(0 0 6px rgba(var(--mode-rgb),.55)); }
@@ -502,7 +502,7 @@ body.sheet-open .sheet { transform: none; }
       <h3>Kart controls</h3>
       <div class="group">
         <div class="segrow"><div class="lbl">Drive mode</div>
-          <div class="seg" id="segMode" role="group" aria-label="Drive mode"><button type="button" data-v="0">Eco</button><button type="button" data-v="1">Normal</button><button type="button" data-v="2">Sport</button></div></div>
+          <div class="seg" id="segMode" role="group" aria-label="Drive mode"><button type="button" data-v="0">Eco</button><button type="button" data-v="1">Drive</button><button type="button" data-v="2">Sport</button></div></div>
         <div class="segrow"><div class="lbl">Headlamps</div>
           <div class="seg" id="segLamp" role="group" aria-label="Headlamps"><button type="button" data-v="0">Auto</button><button type="button" data-v="1">On</button><button type="button" data-v="2">Off</button></div></div>
       </div>
@@ -565,7 +565,7 @@ const CRIT_MASK = (1 << 0) | (1 << 1) | (1 << 3);
 const MC_FAULT = ["Overcurrent", "Bus overvoltage", "Bus undervoltage", "Motor overtemp", "Inverter overtemp", "Hall sensor", "Throttle",
   "Gate driver", "Precharge", "Contactor weld", "Brake + throttle", "Safety loop open", "ECU link lost"];
 const MC_STATE = ["Booting", "Safety loop open", "Precharging", "HV ready", "Driving", "Fault"];
-const MODES = ["Eco", "Normal", "Sport"], LAMPS = ["Auto", "On", "Off"];
+const MODES = ["Eco", "Drive", "Sport"], LAMPS = ["Auto", "On", "Off"];
 // display ranges (estimates, tune on the kart)
 const RPM_MAX = 12000, RPM_RED = 11000, KW_MAX = 70, KW_MIN = -15, V_MIN = 290, V_MAX = 383, NOMINAL_V = 336, DEFAULT_AH = 40, DEFAULT_WH_KM = 90;
 
@@ -691,8 +691,8 @@ function render(s) {
   $("kmh").textContent = fmt(s.kmh, 0);
   $("rpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
   setArc("speedDialV", Math.abs(s.rpm || 0) / RPM_MAX); $("speedDialV").style.stroke = Math.abs(s.rpm || 0) >= RPM_RED ? "#ff453a" : "";
-  const md = s.mode === 0 ? "eco" : s.mode === 2 ? "sport" : "";                 // Normal keeps the orange theme
-  $("modeTxt").textContent = fin(s.mode) && MODES[s.mode] ? `${MODES[s.mode]} mode` : "";
+  const md = s.mode === 0 ? "eco" : s.mode === 2 ? "sport" : "";                 // Drive keeps the orange theme
+  $("modeTxt").textContent = fin(s.mode) && MODES[s.mode] ? MODES[s.mode] : "";
   if (document.body.dataset.mode !== md) document.body.dataset.mode = md;
   // power dial: drive (orange) from zero clockwise, regen (green) from zero anticlockwise
   $("kw").textContent = fmt(s.kw, 1);
@@ -970,8 +970,10 @@ function handleBleLine(line) {
   if (line === "ERR,PIN") { authed = false; syncControls(); toast("Wrong control PIN"); return; }
   if (line === "ERR,MOVING") { toast("Stop the kart before changing drive mode"); return; }
   if (line === "ERR,AUTH") { toast("Enter the control PIN in Settings first"); return; }
-  if (line.startsWith("OK,MODE,")) { toast("Drive mode: " + line.slice(8)); return; }
-  if (line.startsWith("OK,LAMP,")) { toast("Headlamps: " + line.slice(8)); return; }
+  // the kart answers with the number (OK,MODE,1): show its name
+  const named = (list, v) => /^[0-9]$/.test(v) && list[+v] ? list[+v] : v;
+  if (line.startsWith("OK,MODE,")) { toast("Mode: " + named(MODES, line.slice(8))); return; }
+  if (line.startsWith("OK,LAMP,")) { toast("Headlamps: " + named(LAMPS, line.slice(8))); return; }
   if (line.startsWith("OK,")) toast("Kart confirmed " + line.slice(3).replace(",", " "));
 }
 async function send(cmd) {
@@ -1004,8 +1006,8 @@ let demo = { mode: 0, lamp: 0 };
 function demoCmd(cmd) {
   const [c, v] = cmd.split(",");
   setTimeout(() => {
-    if (c === "MODE") { demo.mode = +v; handleBleLine("OK,MODE," + MODES[+v]); }                // demo: any time (not a real kart)
-    if (c === "LAMP") { demo.lamp = +v; handleBleLine("OK,LAMP," + LAMPS[+v]); }
+    if (c === "MODE") { demo.mode = +v; handleBleLine("OK,MODE," + v); }                         // demo: any time (not a real kart); answers like the firmware
+    if (c === "LAMP") { demo.lamp = +v; handleBleLine("OK,LAMP," + v); }
   }, 150);
 }
 $("btnDemo").onclick = () => {
@@ -1045,15 +1047,16 @@ function syncControls() {
     for (const b of $(segId).querySelectorAll("button")) { b.disabled = !ok || (key === "mode" && moving); b.setAttribute("aria-pressed", last && last[key] === +b.dataset.v ? "true" : "false"); }
 }
 $("segMode").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) send(`MODE,${b.dataset.v}`); };
-// tap the mode on the speed dial: Eco -> Normal -> Sport -> Eco
-$("modeTxt").onclick = () => {
+// tap the mode on the speed dial or the dashboard: Eco -> Drive -> Sport -> Eco
+function cycleMode() {
   const live = (source === "ble" && bleRx) || source === "demo";
   if (!live) return toast("Connect to the kart to change the drive mode");
   if (!authed) return toast("Enter the control PIN in Settings first");
   if (kartMoving()) return toast("Stop the kart to change mode");
   const cur = last && fin(last.mode) ? last.mode : 1;
   send(`MODE,${(cur + 1) % 3}`);
-};
+}
+$("modeTxt").onclick = cycleMode;
 $("segLamp").onclick = e => { const b = e.target.closest("button"); if (b && !b.disabled) send(`LAMP,${b.dataset.v}`); };
 
 // ---------- laps + session ----------

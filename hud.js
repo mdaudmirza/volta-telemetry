@@ -202,7 +202,7 @@ function hudMarkup() {
       <div class="txt"><div class="hl">Battery voltage</div><div class="hv"><span id="hV">--</span><small>V</small></div><div class="hs" id="hSoc">SoC --</div><div class="hs" id="hRange">Range --</div></div></div></button>
     <button class="hp h-rpm cut-b" type="button" data-part="motor" aria-label="Motor details"><div class="in">${rpmSvg()}
       <div class="spdc"><span class="big" id="hKmh">--</span><span class="u">km/h</span><span class="hs" id="hRpm">-- rpm</span></div>
-      <span class="mode-chip" id="hMode">Mode --</span></div></button>
+      <span class="mode-chip" id="hMode" role="button" tabindex="0" aria-label="Drive mode. Tap to change">Mode --</span></div></button>
     <button class="hp h-amps cut-bl" type="button" data-part="inverter" aria-label="Pack current, inverter details"><div class="in">${ampSvg()}
       <span class="hl top">Current</span><div class="ampc"><div class="hv"><span id="hA">--</span><small>A</small></div></div></div></button>
     <button class="hp h-power cut-r" type="button" data-part="battery" aria-label="Power, battery details"><div class="in">
@@ -246,6 +246,9 @@ function buildHud() {
   $("hFollow").onclick = () => { if (!hudMap) return; hudMap.follow = !hudMap.follow; $("hFollow").setAttribute("aria-pressed", hudMap.follow); hudMap.update(); };
   $("hFit").onclick = () => { if (!hudMap || lapTrack.length < 2) return; hudMap.follow = false; $("hFollow").setAttribute("aria-pressed", "false"); hudMap.fitLap(30); };
   $("hBig").onclick = () => openMapFull();
+  // the mode chip on the RPM gauge: tap for the next drive mode (not the motor details behind it)
+  $("hMode").addEventListener("click", e => { e.stopPropagation(); cycleMode(); });
+  $("hMode").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); cycleMode(); } });
   $("hKwZero").style.left = (-KW_MIN / (KW_MAX - KW_MIN) * 100) + "%";
 }
 function openHud() {
@@ -346,7 +349,7 @@ function hudRender(s) {
   $("hKmh").textContent = fmt(s.kmh, 0);
   $("hRpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
   $("hRpmArc").style.strokeDashoffset = 100 - 100 * Math.max(0, Math.min(1, Math.abs(s.rpm || 0) / RPM_MAX));
-  $("hMode").textContent = fin(s.mode) ? `${MODES[s.mode]} mode` : "Mode --";
+  $("hMode").textContent = fin(s.mode) && MODES[s.mode] ? MODES[s.mode] : "Mode --";
   // current: needle plus drive (orange) or regen (green) arc from zero
   const a = fin(s.i) ? Math.max(AMP_MIN, Math.min(AMP_MAX, s.i)) : 0, span = AMP_MAX - AMP_MIN, zf = -AMP_MIN / span;
   $("hA").textContent = fmt(s.i, 0);
