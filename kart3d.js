@@ -15,6 +15,7 @@ import { GLTFLoader } from "./vendor/three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "./vendor/three/addons/libs/meshopt_decoder.module.js";
 import { toCreasedNormals } from "./vendor/three/addons/utils/BufferGeometryUtils.js";
 import { RoomEnvironment } from "./vendor/three/addons/environments/RoomEnvironment.js";
+import { RGBELoader } from "./vendor/three/addons/loaders/RGBELoader.js";
 import { OrbitControls } from "./vendor/three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "./vendor/three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "./vendor/three/addons/postprocessing/RenderPass.js";
@@ -33,6 +34,8 @@ const LEVELS = {
 };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const pref = lsGet("gfx") || (lsGet("kart3d") === "off" ? "off" : "auto");
+// Paint (Settings): "app" = the app's studio look, "blender" = the look of the Blender renders. Changing it reloads the app.
+const blenderLook = lsGet("paint") === "blender";
 const capable = (navigator.deviceMemory || 8) >= 6 && (navigator.hardwareConcurrency || 8) >= 6;
 const startLevel = pref === "auto" ? (capable ? "high" : "balanced") : pref;
 
@@ -112,19 +115,28 @@ function start(levelName) {
   let dpr = Math.min(window.devicePixelRatio || 1, L.dpr);
   renderer.setPixelRatio(dpr);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  if (blenderLook) { renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0; }   // Blender paint: the renders' view transform (Khronos PBR Neutral)
+  else { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; }
   renderer.shadowMap.enabled = !!L.shadow; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();                                        // transparent: the stage behind is the backdrop
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture; pmrem.dispose();
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
   scene.environmentIntensity = 0.6;
+  // Blender paint: the studio light the Blender renders use (Poly Haven studio_small_01, CC0); the room above stays if it fails to load
+  if (blenderLook) new RGBELoader().load("env/studio.hdr", t => {
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = pmrem.fromEquirectangular(t).texture; t.dispose(); pmrem.dispose();
+    scene.environmentRotation.set(Math.PI / 2, 0, 0); scene.environmentIntensity = 1.0; need = true;   // the image is y-up, the kart frame z-up
+  }, undefined, () => pmrem.dispose());
+  else pmrem.dispose();
   const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(1.6, -2.2, 3.4);
   if (L.shadow) { key.castShadow = true; key.shadow.mapSize.set(L.shadow, L.shadow);
     Object.assign(key.shadow.camera, { left: -2.2, right: 2.2, top: 2.2, bottom: -2.2, near: 0.5, far: 9 }); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.012; key.shadow.radius = 3; }
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xffb070, 0.9); rim.position.set(-2.5, 2.5, 1.6); scene.add(rim);    // warm back light, PARCO orange
+  // back light: app paint keeps the warm PARCO-orange one; Blender paint a soft near-white one (the warm one turns the charcoal copper)
+  const rim = blenderLook ? new THREE.DirectionalLight(0xfff0e0, 0.45) : new THREE.DirectionalLight(0xffb070, 0.9); rim.position.set(-2.5, 2.5, 1.6); scene.add(rim);
   const fill = new THREE.DirectionalLight(0x9fc4ff, 0.5); fill.position.set(-2, -2, 1); scene.add(fill);
 
   const camera = new THREE.PerspectiveCamera(28, 1, 0.03, 60);
@@ -245,7 +257,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   for (const [c, { off }] of Object.entries(COMPS)) { comps[c] = new THREE.Group(); comps[c].userData.off = new THREE.Vector3(...off); }
   comps.headlights.add(lamps);
   function addPart(g, cls, mat) {                                           // sort a non-indexed geometry's triangles into compartments
-    const P = g.attributes.position.array, N = g.attributes.normal.array, n = P.length / 9, which = new Array(n), count = {};
+    const P = g.attributes.position.array, N = g.attributes.normal.array, C = g.attributes.color && g.attributes.color.array, n = P.length / 9, which = new Array(n), count = {};
     for (let t = 0; t < n; t++) {
       const i = t * 9, z0 = P[i + 2], z1 = P[i + 5], z2 = P[i + 8];
       // drop the flat floor pan under the seats (1.3 x 1.9 m): it reads as a black slab, worst in the split view
@@ -254,14 +266,23 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
       which[t] = c; count[c] = (count[c] || 0) + 1;
     }
     for (const c of Object.keys(count)) {
-      const p = new Float32Array(count[c] * 9), q = new Float32Array(count[c] * 9); let k = 0;
-      for (let t = 0; t < n; t++) if (which[t] === c) { p.set(P.subarray(t * 9, t * 9 + 9), k); q.set(N.subarray(t * 9, t * 9 + 9), k); k += 9; }
+      const p = new Float32Array(count[c] * 9), q = new Float32Array(count[c] * 9), r = C && new Float32Array(count[c] * 9); let k = 0;
+      for (let t = 0; t < n; t++) if (which[t] === c) { p.set(P.subarray(t * 9, t * 9 + 9), k); q.set(N.subarray(t * 9, t * 9 + 9), k); if (r) r.set(C.subarray(t * 9, t * 9 + 9), k); k += 9; }
       const sub = new THREE.BufferGeometry(); sub.setAttribute("position", new THREE.BufferAttribute(p, 3)); sub.setAttribute("normal", new THREE.BufferAttribute(q, 3));
+      if (r) sub.setAttribute("color", new THREE.BufferAttribute(r, 3));
       const m = new THREE.Mesh(sub, mat); m.castShadow = !!L.shadow; m.receiveShadow = !!L.shadow && cls !== "tyre"; m.userData.mat = mat; m.userData.cls = cls;
       m.userData.part = cls === "caliper" ? "brakes" : COMPS[c].part; comps[c].add(m);
     }
   }
   const floats = a => { const f = new Float32Array(a.count * 3); for (let i = 0; i < a.count; i++) { f[i * 3] = a.getX(i); f[i * 3 + 1] = a.getY(i); f[i * 3 + 2] = a.getZ(i); } return f; };
+  // soft shadows baked in Blender arrive as vertex colours (COLOR_0): each material gets a twin that multiplies them in
+  const baked = new Map();
+  const withAO = (mat, key) => {
+    if (!baked.has(mat)) { const c = mat.clone(); c.vertexColors = true; c.onBeforeCompile = mat.onBeforeCompile; c.customProgramCacheKey = () => key + ":ao"; baked.set(mat, c); }
+    return baked.get(mat);
+  };
+  // app paint leaves the baked shadows out
+  const copyColor = (src, g) => { const c = blenderLook && src.getAttribute("color"); if (c) g.setAttribute("color", new THREE.BufferAttribute(floats(c), 3)); return !!c; };
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   // battery, controller, motor and cooling come from model/parts.glb (made in Blender); if it fails to load, the simple ones below are drawn instead
   const PART_MODEL = { battery: ["battery", "battery"], inverter: ["controller", "inverter"], motor: ["motor", "motor"], cooling: ["cooling", "cooling"] };
@@ -270,9 +291,10 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     gltf.scene.traverse(o => {
       if (!o.isMesh) return;
       let p = o; while (p && !PART_MODEL[p.name]) p = p.parent; if (!p) return;
-      const [comp, part] = PART_MODEL[p.name], name = o.material && o.material.name, mat = name === "orange" ? orange : M[name] || M.pack;
+      const [comp, part] = PART_MODEL[p.name], name = o.material && o.material.name;
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(floats(o.geometry.getAttribute("position")), 3));
       const nrm = o.geometry.getAttribute("normal"); if (nrm) g.setAttribute("normal", new THREE.BufferAttribute(floats(nrm), 3));
+      const ao = copyColor(o.geometry, g), base = name === "orange" ? orange : M[name] || M.pack, mat = ao ? withAO(base, name) : base;
       g.setIndex(o.geometry.getIndex()); g.applyMatrix4(o.matrixWorld); if (!nrm) g.computeVertexNormals();
       const m = new THREE.Mesh(g, mat); m.castShadow = !!L.shadow; m.receiveShadow = !!L.shadow; m.userData.part = part; comps[comp].add(m); got.add(comp);
     });
@@ -282,10 +304,11 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     kart = new THREE.Group(); gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse(o => {
       if (!o.isMesh) return;
-      const name = (o.material && o.material.name) || o.name, mat = M[name] || M.body;
+      const name = (o.material && o.material.name) || o.name;
       // positions (and normals, in the High model) arrive quantized with a node transform: copy to float and bake the transform
       let g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(floats(o.geometry.getAttribute("position")), 3));
       const nrm = o.geometry.getAttribute("normal"); if (nrm) g.setAttribute("normal", new THREE.BufferAttribute(floats(nrm), 3));
+      const mat = copyColor(o.geometry, g) ? withAO(M[name] || M.body, name) : M[name] || M.body;
       g.setIndex(o.geometry.getIndex()); g.applyMatrix4(o.matrixWorld);
       g = nrm ? g.toNonIndexed() : toCreasedNormals(g, name === "tyre" || name === "rim" ? 0.9 : 0.6);   // light model: work out the normals here
       addPart(g, name, mat);

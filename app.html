@@ -518,6 +518,12 @@ body.sheet-open .sheet { transform: none; }
         <button class="rowi" type="button" role="radio" data-v="off"><span>Off</span><span class="muted">Flat top view</span></button>
       </div>
       <p class="note">Automatic starts at High on capable phones and steps down by itself if frames get slow. Changing this reloads the app.</p>
+      <h3>Paint</h3>
+      <div class="group radio" id="paintGroup" role="radiogroup" aria-label="Kart paint">
+        <button class="rowi" type="button" role="radio" data-v="app"><span>App paint</span><span class="muted">Studio look</span></button>
+        <button class="rowi" type="button" role="radio" data-v="blender"><span>Blender paint</span><span class="muted">Like the Blender renders</span></button>
+      </div>
+      <p class="note">Blender paint adds soft shadows, studio reflections and the renders' colours. Changing this reloads the app.</p>
       <div id="installBox" hidden>
         <h3>App</h3>
         <div class="group"><button class="rowi" type="button" id="btnInstall"><span>Install on This Phone</span><svg class="ico chev" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
@@ -1112,6 +1118,13 @@ $("gfxGroup").onclick = e => {
   const b = e.target.closest("button"); if (!b || b.getAttribute("aria-checked") === "true") return;
   store.set("gfx", b.dataset.v); store.set("kart3d", ""); gfxUi(); toast("Applying graphics setting…"); setTimeout(() => location.reload(), 500);
 };
+// kart paint (read by kart3d.js when the page loads)
+function paintUi() { const now = store.get("paint", "app"); for (const b of $("paintGroup").querySelectorAll("button")) b.setAttribute("aria-checked", b.dataset.v === now); }
+$("paintGroup").onclick = e => {
+  const b = e.target.closest("button"); if (!b || b.getAttribute("aria-checked") === "true") return;
+  store.set("paint", b.dataset.v); paintUi(); toast("Applying paint…"); setTimeout(() => location.reload(), 500);
+};
+paintUi();
 // clock and date: full screen hides the phone's own status bar
 function tickClock() {
   const d = new Date();

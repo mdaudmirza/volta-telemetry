@@ -1,9 +1,9 @@
 // Caches the app so it opens at the track with no internet (Bluetooth mode needs no internet).
 // Map tiles are kept as you view them (up to TILE_MAX), so a track you have opened once still shows offline.
-const CACHE = "crosskart-v24", TILES = "crosskart-tiles-v1", TILE_MAX = 3000;
-const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "parco-logo.png", "parco-nose.png", "kart3d.js", "hud.js", "hud.css", "model/volta.glb", "model/parts.glb",
+const CACHE = "crosskart-v25", TILES = "crosskart-tiles-v1", TILE_MAX = 3000;
+const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "parco-logo.png", "parco-nose.png", "kart3d.js", "hud.js", "hud.css", "model/volta.glb", "model/parts.glb", "env/studio.hdr",
   "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css",
-  "vendor/three/three.module.min.js", "vendor/three/addons/loaders/GLTFLoader.js", "vendor/three/addons/utils/BufferGeometryUtils.js",
+  "vendor/three/three.module.min.js", "vendor/three/addons/loaders/GLTFLoader.js", "vendor/three/addons/loaders/RGBELoader.js", "vendor/three/addons/utils/BufferGeometryUtils.js",
   "vendor/three/addons/libs/meshopt_decoder.module.js", "vendor/three/addons/environments/RoomEnvironment.js", "vendor/three/addons/controls/OrbitControls.js",
   "vendor/three/addons/postprocessing/EffectComposer.js", "vendor/three/addons/postprocessing/RenderPass.js", "vendor/three/addons/postprocessing/OutputPass.js",
   "vendor/three/addons/postprocessing/GTAOPass.js", "vendor/three/addons/postprocessing/Pass.js", "vendor/three/addons/postprocessing/ShaderPass.js",
