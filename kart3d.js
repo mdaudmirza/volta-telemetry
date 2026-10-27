@@ -50,7 +50,7 @@ const ZONES = {
   headlights: [[0.00, -1.52, -0.32, 0.32, -1.18, 0.05]],
   rearlights: [[0.00, 1.25, -0.45, 0.50, 1.33, 0.15]],
   motor:      [[0.00, 0.87, -0.37, 0.15, 1.13, -0.11]],
-  inverter:   [[0.00, 0.80, -0.27, 0.17, 0.88, -0.01]],
+  inverter:   [[0.00, 0.785, -0.32, 0.18, 0.88, -0.08]],
   battery:    [[0.00, 0.61, -0.45, 0.41, 0.81, 0.05], [0.00, -0.56, -0.45, 0.08, 0.62, -0.15]],
   cooling:    [[0.00, 1.09, -0.14, 0.23, 1.24, 0.14]],
   driver:     [[0.00, -0.04, -0.30, 0.46, 0.62, 0.40]],
@@ -183,6 +183,24 @@ function start(levelName) {
     hose:    new THREE.MeshStandardMaterial({ color: 0x17191c, metalness: 0.1, roughness: 0.6 }),
   };
   const orange = new THREE.MeshStandardMaterial({ color: 0xff8a1f, metalness: 0.3, roughness: 0.45 });
+  M.orange = orange;
+  // two paints: the app's own (above) and the colours exported from Blender, read from the model files as they load.
+  // Switching only changes colour, metalness and gloss of these same materials, so logos, highlights and split view keep working.
+  const look = m => ({ color: m.color.clone(), metalness: m.metalness, roughness: m.roughness, clearcoat: m.clearcoat || 0 });
+  const PAINT = { app: Object.fromEntries(Object.entries(M).map(([k, m]) => [k, look(m)])), blender: {} };
+  let paint = lsGet("paint") === "blender" ? "blender" : "app";
+  function keepBlender(m) {                                           // a model file's own material, by name
+    if (!m || !M[m.name] || PAINT.blender[m.name]) return;
+    PAINT.blender[m.name] = { color: m.color.clone(), metalness: m.metalness ?? 0, roughness: m.roughness ?? 0.5, clearcoat: 0 };
+  }
+  function applyPaint(which) {
+    paint = which === "blender" ? "blender" : "app";
+    for (const [k, m] of Object.entries(M)) {
+      const p = (paint === "blender" && PAINT.blender[k]) || PAINT.app[k];
+      m.color.copy(p.color); m.metalness = p.metalness; m.roughness = p.roughness; if ("clearcoat" in m) m.clearcoat = p.clearcoat;
+    }
+    seeThrough.clear(); need = true;                                  // see-through copies are made again with the new colours
+  }
   // while split, the chassis (frame and body panels) keeps its colours but turns see-through, so the compartments stand out
   const seeThrough = new Map();
   const ghostOf = mat => {
@@ -219,9 +237,9 @@ ${name === "body" ? `
 if (abs(kn.x) > 0.55 && kp.x > 0.5 && kp.y > 0.14 && kp.y < 0.78 && kp.z > -0.33 && kp.z < -0.11) {
   vec2 uv = vec2((vKPos.y - 0.14) / 0.64, (vKPos.z + 0.33) / 0.22); if (vKPos.x < 0.0) uv.x = 1.0 - uv.x;
   vec4 d = texture2D(uSide, uv); diffuseColor.rgb = mix(diffuseColor.rgb, d.rgb, d.a); }
-// rear wing decal: upper faces, projected along z, reads from the front
-if (kn.z > 0.6 && kp.x < 0.5 && vKPos.y > 0.86 && vKPos.y < 1.2 && vKPos.z > 0.2) {
-  vec2 uv = vec2((vKPos.x + 0.5) / 1.0, (vKPos.y - 0.86) / 0.34);
+// spoiler decal: top of the main plane between the endplates, projected along z, reads from the front
+if (kn.z > 0.6 && kp.x < 0.45 && vKPos.y > 1.185 && vKPos.y < 1.455 && vKPos.z > 0.33) {
+  vec2 uv = vec2((vKPos.x + 0.45) / 0.9, (vKPos.y - 1.185) / 0.27);
   vec4 d = texture2D(uWing, uv); diffuseColor.rgb = mix(diffuseColor.rgb, d.rgb, d.a * 0.95); }
 // nose logo (team artwork): top of the nose cone, upright and readable for someone standing in front of the kart
 // (their right is +x, "up" on the nose runs away from them towards +y)
@@ -263,11 +281,28 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   }
   const floats = a => { const f = new Float32Array(a.count * 3); for (let i = 0; i < a.count; i++) { f[i * 3] = a.getX(i); f[i * 3 + 1] = a.getY(i); f[i * 3 + 2] = a.getZ(i); } return f; };
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  loader.load(L.model, gltf => {
+  // battery, controller, motor and cooling come from model/parts.glb (made in Blender); if it fails to load, the simple ones below are drawn instead
+  const PART_MODEL = { battery: ["battery", "battery"], inverter: ["controller", "inverter"], motor: ["motor", "motor"], cooling: ["cooling", "cooling"] };
+  function addModelParts(gltf) {
+    const got = new Set(); gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse(o => {
+      if (!o.isMesh) return;
+      let p = o; while (p && !PART_MODEL[p.name]) p = p.parent; if (!p) return;
+      keepBlender(o.material);
+      const [comp, part] = PART_MODEL[p.name], name = o.material && o.material.name, mat = name === "orange" ? orange : M[name] || M.pack;
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(floats(o.geometry.getAttribute("position")), 3));
+      const nrm = o.geometry.getAttribute("normal"); if (nrm) g.setAttribute("normal", new THREE.BufferAttribute(floats(nrm), 3));
+      g.setIndex(o.geometry.getIndex()); g.applyMatrix4(o.matrixWorld); if (!nrm) g.computeVertexNormals();
+      const m = new THREE.Mesh(g, mat); m.castShadow = !!L.shadow; m.receiveShadow = !!L.shadow; m.userData.part = part; comps[comp].add(m); got.add(comp);
+    });
+    return got;
+  }
+  Promise.all([loader.loadAsync(L.model), loader.loadAsync("model/parts.glb").catch(err => { console.warn("parts model unavailable, drawing simple parts:", err); return null; })]).then(([gltf, parts]) => {
     kart = new THREE.Group(); gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse(o => {
       if (!o.isMesh) return;
       const name = (o.material && o.material.name) || o.name, mat = M[name] || M.body;
+      keepBlender(o.material);
       // positions (and normals, in the High model) arrive quantized with a node transform: copy to float and bake the transform
       let g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(floats(o.geometry.getAttribute("position")), 3));
       const nrm = o.geometry.getAttribute("normal"); if (nrm) g.setAttribute("normal", new THREE.BufferAttribute(floats(nrm), 3));
@@ -279,13 +314,16 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     const disc = new THREE.CylinderGeometry(0.135, 0.135, 0.022, 48); disc.rotateZ(Math.PI / 2);
     const discMat = new THREE.MeshStandardMaterial({ color: 0x9a9da2, metalness: 1, roughness: 0.42 });
     for (const [sx, y, id] of WHEELS) { const d = new THREE.Mesh(disc, discMat); d.position.set(0.685 * sx, y, -0.245); d.userData.part = "brakes"; comps["wheel" + id].add(d); }
-    comps.battery.add(makePack()); comps.motor.add(makeMotor()); comps.controller.add(makeController()); comps.cooling.add(makeCooling());
+    const got = parts ? addModelParts(parts) : new Set();
+    comps.battery.add(got.has("battery") ? packLabel() : makePack()); comps.controller.add(got.has("controller") ? ctrlPlate() : makeController());
+    if (!got.has("motor")) comps.motor.add(makeMotor()); if (!got.has("cooling")) comps.cooling.add(makeCooling());
     comps.chassis.add(makeDash());
     for (const g of Object.values(comps)) { g.userData.centre = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()); kart.add(g); }
     scene.add(kart);
+    applyPaint(paint);
     wrap.classList.add("has3d");
     view("all", true); applyState(); need = true;
-  }, undefined, err => { console.warn("3D kart unavailable, keeping the top view:", err); renderer.domElement.remove(); });
+  }, err => { console.warn("3D kart unavailable, keeping the top view:", err); renderer.domElement.remove(); });
 
   const tagger = (g, part) => (m, shadow = true) => { m.castShadow = shadow && !!L.shadow; m.receiveShadow = !!L.shadow; m.userData.part = part; g.add(m); return m; };
   // battery: an upright crossbar behind the seat backs and a low stem between the seats, with an orange HV band and a label on top
@@ -297,6 +335,10 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
       add(new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, ln + 0.02, 0.016).translate(0, yc, z1 - 0.012), orange));   // orange rim
     }
     for (let i = 0; i < 10; i++) add(new THREE.Mesh(new THREE.BoxGeometry(PACK.STEM.w - 0.04, 0.07, 0.01).translate(0, PACK.STEM.y0 + 0.07 + i * 0.105, PACK.STEM.z1 + 0.005), M.pack));
+    g.add(packLabel());
+    return g;
+  }
+  function packLabel() {                                                    // HV label on top of the crossbar
     const B = PACK.BAR, tex = decal(512, 256, (c, W, H) => {
       c.fillStyle = "rgba(20,22,25,.92)"; c.beginPath(); c.roundRect(6, 6, W - 12, H - 12, 22); c.fill();
       c.strokeStyle = "#ff8a1f"; c.lineWidth = 6; c.stroke();
@@ -306,8 +348,8 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
       c.fillStyle = "#a3a7ae"; c.font = "600 38px Inter, Arial, sans-serif"; c.fillText("LiFePO4 battery", 145, 168);
     });
     const lid = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.12), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
-    lid.position.set(0, (B.y0 + B.y1) / 2, B.z1 + 0.002); lid.userData.part = "battery"; g.add(lid);
-    return g;
+    lid.position.set(0, (B.y0 + B.y1) / 2, B.z1 + 0.002); lid.userData.part = "battery";
+    return lid;
   }
   // motor: a PMSM can across the rear, with lighter end caps and an orange HV lead
   function makeMotor() {
@@ -323,13 +365,17 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     const g = new THREE.Group(), add = tagger(g, "inverter");
     add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.24).translate(0, CTRL.y, CTRL.z), M.pack));
     for (let i = 0; i < 8; i++) add(new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.03, 0.13).translate(-0.126 + i * 0.036, CTRL.y + 0.04, CTRL.z - 0.05), M.metal));   // fins, lower rear face
+    g.add(ctrlPlate());
+    return g;
+  }
+  function ctrlPlate() {                                                    // name plate on the controller's upper rear face
     const tex = decal(256, 96, (c, W, H) => { c.fillStyle = "rgba(20,22,25,.95)"; c.beginPath(); c.roundRect(4, 4, W - 8, H - 8, 14); c.fill();
       c.strokeStyle = "#ff8a1f"; c.lineWidth = 4; c.stroke(); c.fillStyle = "#fff"; c.font = "800 34px Inter, Arial, sans-serif"; c.textAlign = "center"; c.fillText("INVERTER", W / 2, 46);
       c.fillStyle = "#a3a7ae"; c.font = "600 22px Inter, Arial, sans-serif"; c.fillText("STM32 · 3-phase", W / 2, 76); });
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.06), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
     plate.position.set(0, CTRL.y + 0.026, CTRL.z + 0.07); plate.up.set(0, 0, 1); plate.lookAt(0, CTRL.y + 1, CTRL.z + 0.07);   // upper rear face, upright
-    plate.userData.part = "inverter"; g.add(plate);
-    return g;
+    plate.userData.part = "inverter";
+    return plate;
   }
   // active cooling: radiator with an electric fan on its rear face, header tanks, a pump and hoses to the motor and the controller
   function makeCooling() {
@@ -575,6 +621,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   }
 
   window.kart3d = {
+    paint(which) { applyPaint(which); },
     update(s) { state = s; applyState(performance.now()); },
     select(part) { selected = part || null; view(part || "all"); applyState(performance.now()); },
     explode, home, quality: levelName,
