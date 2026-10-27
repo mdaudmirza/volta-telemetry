@@ -183,24 +183,6 @@ function start(levelName) {
     hose:    new THREE.MeshStandardMaterial({ color: 0x17191c, metalness: 0.1, roughness: 0.6 }),
   };
   const orange = new THREE.MeshStandardMaterial({ color: 0xff8a1f, metalness: 0.3, roughness: 0.45 });
-  M.orange = orange;
-  // two paints: the app's own (above) and the colours exported from Blender, read from the model files as they load.
-  // Switching only changes colour, metalness and gloss of these same materials, so logos, highlights and split view keep working.
-  const look = m => ({ color: m.color.clone(), metalness: m.metalness, roughness: m.roughness, clearcoat: m.clearcoat || 0 });
-  const PAINT = { app: Object.fromEntries(Object.entries(M).map(([k, m]) => [k, look(m)])), blender: {} };
-  let paint = lsGet("paint") === "blender" ? "blender" : "app";
-  function keepBlender(m) {                                           // a model file's own material, by name
-    if (!m || !M[m.name] || PAINT.blender[m.name]) return;
-    PAINT.blender[m.name] = { color: m.color.clone(), metalness: m.metalness ?? 0, roughness: m.roughness ?? 0.5, clearcoat: 0 };
-  }
-  function applyPaint(which) {
-    paint = which === "blender" ? "blender" : "app";
-    for (const [k, m] of Object.entries(M)) {
-      const p = (paint === "blender" && PAINT.blender[k]) || PAINT.app[k];
-      m.color.copy(p.color); m.metalness = p.metalness; m.roughness = p.roughness; if ("clearcoat" in m) m.clearcoat = p.clearcoat;
-    }
-    seeThrough.clear(); need = true;                                  // see-through copies are made again with the new colours
-  }
   // while split, the chassis (frame and body panels) keeps its colours but turns see-through, so the compartments stand out
   const seeThrough = new Map();
   const ghostOf = mat => {
@@ -288,7 +270,6 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     gltf.scene.traverse(o => {
       if (!o.isMesh) return;
       let p = o; while (p && !PART_MODEL[p.name]) p = p.parent; if (!p) return;
-      keepBlender(o.material);
       const [comp, part] = PART_MODEL[p.name], name = o.material && o.material.name, mat = name === "orange" ? orange : M[name] || M.pack;
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(floats(o.geometry.getAttribute("position")), 3));
       const nrm = o.geometry.getAttribute("normal"); if (nrm) g.setAttribute("normal", new THREE.BufferAttribute(floats(nrm), 3));
@@ -302,7 +283,6 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     gltf.scene.traverse(o => {
       if (!o.isMesh) return;
       const name = (o.material && o.material.name) || o.name, mat = M[name] || M.body;
-      keepBlender(o.material);
       // positions (and normals, in the High model) arrive quantized with a node transform: copy to float and bake the transform
       let g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(floats(o.geometry.getAttribute("position")), 3));
       const nrm = o.geometry.getAttribute("normal"); if (nrm) g.setAttribute("normal", new THREE.BufferAttribute(floats(nrm), 3));
@@ -320,7 +300,6 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     comps.chassis.add(makeDash());
     for (const g of Object.values(comps)) { g.userData.centre = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()); kart.add(g); }
     scene.add(kart);
-    applyPaint(paint);
     wrap.classList.add("has3d");
     view("all", true); applyState(); need = true;
   }, err => { console.warn("3D kart unavailable, keeping the top view:", err); renderer.domElement.remove(); });
@@ -621,7 +600,6 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   }
 
   window.kart3d = {
-    paint(which) { applyPaint(which); },
     update(s) { state = s; applyState(performance.now()); },
     select(part) { selected = part || null; view(part || "all"); applyState(performance.now()); },
     explode, home, quality: levelName,
