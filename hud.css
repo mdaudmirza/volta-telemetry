@@ -234,3 +234,8 @@ button.hp:focus-visible { outline: none; background: #fff; }
 .vsegs i.on.low { color: var(--h-crit); } .vsegs i.on.mid { color: var(--h-warn); }
 /* upright phone: the map is a full-width row, a smaller point keeps it readable */
 @media (max-aspect-ratio: 1/1) { .h-map { --hx: 24px; } }
+/* tight, interlocking panels: 4 px seams, the map's chamfered top nests under the speed gauge, straight sides sit flush with its neighbours */
+.hud-grid { gap: 4px; }
+.h-map { --shape: polygon(calc(2.4 * var(--h-c)) 0, calc(100% - 2.4 * var(--h-c)) 0, 100% calc(1.6 * var(--h-c)), 100% calc(100% - var(--h-c)),
+  calc(100% - var(--h-c)) 100%, var(--h-c) 100%, 0 calc(100% - var(--h-c)), 0 calc(1.6 * var(--h-c))); }
+.h-map .mapui.tl { left: 14px; } .h-map .mapui.br { right: 12px; }
