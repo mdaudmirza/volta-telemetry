@@ -266,3 +266,24 @@ button.hp:focus-visible { outline: none; background: #fff; }
   0% { opacity: 0; filter: brightness(2.4) saturate(0); transform: scale(.97); }
   25% { opacity: .85; } 35% { opacity: .2; } 50% { opacity: 1; filter: brightness(1.7) saturate(.6); }
   100% { opacity: 1; filter: none; transform: none; } }
+
+/* ---------- harmony of the two references: cool cyan frames (the team's reference image), PARCO drive-mode colour on the data,
+   crimson for the redline and the seam between speed gauge and map. Warning / fault edges still override the frame colour. ---------- */
+.hud { --h-frame: 92, 208, 230; --h-edge: rgba(var(--h-frame), .78); --h-edge2: rgba(var(--h-frame), .2); }
+.hp > .in { box-shadow: inset 0 0 22px rgba(var(--h-frame), .1), inset 0 0 2px rgba(var(--h-frame), .55); }
+.hud-grid::before { background: radial-gradient(closest-side, rgba(var(--h-frame), .12), transparent); }
+.hv { text-shadow: 0 0 14px rgba(var(--h-frame), .25); }
+.spdc .big { text-shadow: 0 0 18px rgba(var(--h-frame), .35); }
+.hl { color: #9fb7bd; }
+/* data in the drive-mode colour: tachometer LEDs run mode colour -> PARCO orange -> crimson */
+.rpmg .led.g { stroke: var(--h-acc); } .rpmg .led.g.on { color: var(--h-acc); }
+.rpmg .trk { stroke: rgba(var(--h-frame), .22); }
+.rpmg .tick { stroke: rgba(var(--h-frame), .6); } .rpmg .tick.minor { stroke: rgba(var(--h-frame), .28); }
+.ampg .tick { stroke: rgba(var(--h-frame), .55); } .ampg .trk { stroke: rgba(var(--h-frame), .15); }
+#hThr { background: var(--h-acc); box-shadow: 0 0 8px var(--h-acc); }
+.vsegs { border-color: rgba(var(--h-frame), .35); }
+/* map: the reference's cyan tactical look */
+.h-map .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.6) contrast(1.2) sepia(.5) hue-rotate(150deg) saturate(1.6); }
+.h-map > .in::after { background: repeating-linear-gradient(0deg, rgba(var(--h-frame), .07) 0 1px, transparent 1px 28px),
+  repeating-linear-gradient(90deg, rgba(var(--h-frame), .07) 0 1px, transparent 1px 28px); box-shadow: inset 0 0 40px rgba(0,0,0,.7); }
+.mbtn { border-color: rgba(var(--h-frame), .6); }

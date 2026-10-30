@@ -208,6 +208,8 @@ body:not([data-mode="eco"]):not([data-mode="sport"]) .dial .mode { color: rgba(2
 .dial .red { fill: none; stroke: rgba(255,69,58,.85); }
 .dial .tick { stroke: rgba(255,255,255,.62); stroke-width: 2; } .dial .tick.minor { stroke: rgba(255,255,255,.3); stroke-width: 1.4; }
 .dial text { fill: rgba(255,255,255,.75); font: 600 13px var(--font); text-anchor: middle; dominant-baseline: middle; }
+/* the same squared digits as the driver's dashboard, so both screens read as one design */
+.dial .big, .dial text, .socbar .pct { font-family: "Chakra Petch", var(--font); letter-spacing: 0; }
 .dial .big small { font-size: .42em; font-weight: 600; letter-spacing: 0; margin-left: 1px; color: rgba(255,255,255,.7); }
 .kwdial { width: calc(var(--g) * .62); margin-bottom: calc(var(--g) * .02); }
 
