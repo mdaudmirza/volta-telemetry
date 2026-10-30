@@ -300,7 +300,10 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     });
     return got;
   }
-  Promise.all([loader.loadAsync(L.model), loader.loadAsync("model/parts.glb").catch(err => { console.warn("parts model unavailable, drawing simple parts:", err); return null; })]).then(([gltf, parts]) => {
+  // download progress for the launch screen's bar (both files together)
+  const got = {}, onProg = k => e => { if (!e.total) return; got[k] = [e.loaded, e.total]; const v = Object.values(got);
+    window.dispatchEvent(new CustomEvent("kartprogress", { detail: v.reduce((a, b) => a + b[0], 0) / v.reduce((a, b) => a + b[1], 0) })); };
+  Promise.all([loader.loadAsync(L.model, onProg("kart")), loader.loadAsync("model/parts.glb", onProg("parts")).catch(err => { console.warn("parts model unavailable, drawing simple parts:", err); return null; })]).then(([gltf, parts]) => {
     kart = new THREE.Group(); gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse(o => {
       if (!o.isMesh) return;
@@ -324,8 +327,9 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
     for (const g of Object.values(comps)) { g.userData.centre = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()); kart.add(g); }
     scene.add(kart);
     wrap.classList.add("has3d");
+    window.dispatchEvent(new Event("kartready"));
     view("all", true); applyState(); need = true;
-  }, err => { console.warn("3D kart unavailable, keeping the top view:", err); renderer.domElement.remove(); });
+  }, err => { console.warn("3D kart unavailable, keeping the top view:", err); renderer.domElement.remove(); window.dispatchEvent(new Event("kartready")); });
 
   const tagger = (g, part) => (m, shadow = true) => { m.castShadow = shadow && !!L.shadow; m.receiveShadow = !!L.shadow; m.userData.part = part; g.add(m); return m; };
   // battery: an upright crossbar behind the seat backs and a low stem between the seats, with an orange HV band and a label on top
@@ -632,4 +636,4 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
 }
 
 window.kart3dLevel = webglOk() ? startLevel : "off";
-if (host && window.kart3dLevel !== "off") start(startLevel);
+if (host && window.kart3dLevel !== "off") start(startLevel); else window.dispatchEvent(new Event("kartready"));

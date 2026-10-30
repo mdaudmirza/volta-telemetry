@@ -5,7 +5,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="hud.css">
 <style>
@@ -77,6 +77,26 @@ body[data-tab="drive"] .backbtn { display: none; }
 .rotate svg { width: 64px; height: 64px; fill: none; stroke: #ff8a1f; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .rotate p { margin: 0; font-size: 17px; font-weight: 600; }
 @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) { .rotate { display: grid; } }
+/* launch screen */
+.boot { position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; justify-items: center; gap: 22px; background: #050506; color: #fff;
+  transition: opacity .55s ease, transform .55s ease; }
+.boot.out { opacity: 0; transform: scale(1.04); pointer-events: none; }
+.boot-pre { margin: 0; font: 600 11px "Chakra Petch", var(--font); letter-spacing: .42em; text-transform: uppercase; color: #8a8d93; animation: bootFade .7s ease both; }
+.boot-stage { position: relative; width: min(74vw, 620px, 120vh); aspect-ratio: 1400 / 520; display: grid; place-items: center; }
+.boot-word { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -46%); font: 400 clamp(90px, min(30vw, 48vh), 300px) / 1 Anton, "Archivo Black", Impact, sans-serif;
+  letter-spacing: .02em; color: #16171a; white-space: nowrap; animation: bootRise 1.1s .9s cubic-bezier(.2,.8,.2,1) both; }
+.boot-kart { position: relative; width: 100%; height: auto; filter: drop-shadow(0 0 18px rgba(255,255,255,.12)); animation: bootDraw 1.2s .35s cubic-bezier(.65,0,.35,1) both; }
+.boot-bar { width: 180px; height: 2px; background: rgba(255,255,255,.08); overflow: hidden; animation: bootFade .5s .6s ease both; }
+.boot-bar i { display: block; width: 0; height: 100%; background: #ff8a1f; box-shadow: 0 0 10px #ff8a1f; transition: width .3s ease; }
+.boot-start { min-width: 168px; min-height: 52px; padding: 0 28px; border: 0; background: #ff8a1f; color: #0b0c0e; font: 700 15px "Chakra Petch", var(--font);
+  letter-spacing: .32em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 28px rgba(255,138,31,.35); animation: bootFade .45s ease both;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+.boot-start:active { transform: scale(.97); }
+.boot:has(.boot-start:not([hidden])) .boot-bar { visibility: hidden; }   /* START takes the bar's place */
+@keyframes bootFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes bootDraw { from { clip-path: inset(0 100% 0 0); opacity: .2; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
+@keyframes bootRise { from { opacity: 0; transform: translate(-50%, -12%); } to { opacity: 1; transform: translate(-50%, -46%); } }
+@media (prefers-reduced-motion: reduce) { .boot *, .boot { animation: none !important; transition: none !important; } }
 /* time and date, top centre: full screen hides the phone's own status bar */
 .timebox { position: fixed; z-index: 21; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: grid; justify-items: center; pointer-events: none; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
@@ -386,6 +406,13 @@ body.sheet-open .sheet { transform: none; }
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 </svg>
 
+<!-- launch screen, like the team website's intro: the kart drawn in, VOLTA rising behind it, then START -->
+<div class="boot" id="boot" role="dialog" aria-label="VOLTA is starting">
+  <p class="boot-pre">Sonic Engineering presents</p>
+  <div class="boot-stage"><span class="boot-word" aria-hidden="true">VOLTA</span><img class="boot-kart" src="kart-line.png" alt="VOLTA kart"></div>
+  <div class="boot-bar" aria-hidden="true"><i id="bootBar"></i></div>
+  <button class="boot-start" id="bootStart" type="button" hidden>Start</button>
+</div>
 <div class="app" id="app">
   <!-- floating bar: menu, clock and date (the phone's own status bar is hidden in full screen), connection status -->
   <header class="hudbar">
@@ -1125,6 +1152,17 @@ $("paintGroup").onclick = e => {
   store.set("paint", b.dataset.v); paintUi(); toast("Applying paint…"); setTimeout(() => location.reload(), 500);
 };
 paintUi();
+// launch screen: shows while the 3D kart loads (the bar is real download progress), then START, which also goes full screen
+const bootT0 = performance.now(); let bootReady = false;
+const bootProgress = f => { $("bootBar").style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + "%"; };
+function bootDone() {
+  if (bootReady) return; bootReady = true; bootProgress(1);
+  setTimeout(() => { $("bootStart").hidden = false; $("bootStart").focus({ preventScroll: true }); }, Math.max(0, 2300 - (performance.now() - bootT0)));
+}
+window.addEventListener("kartprogress", e => bootProgress(e.detail));
+window.addEventListener("kartready", bootDone);
+setTimeout(bootDone, 9000);                                                  // never keep the driver waiting longer than this
+$("bootStart").onclick = () => { $("boot").classList.add("out"); setTimeout(() => $("boot").remove(), 600); };   // the tap also goes full screen (handler below)
 // clock and date: full screen hides the phone's own status bar
 function tickClock() {
   const d = new Date();

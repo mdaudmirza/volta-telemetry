@@ -246,7 +246,7 @@ function hudMarkup() {
 let hudMap = null, hudBuilt = false, hudTimer = null;
 // Sideways the panels interlock like the team's reference: each is a polygon on one shared plan (percent of the dashboard),
 // the speed gauge a trapezoid, the map a hexagon under it, the others wrapped around their slanted sides. Every polygon is
-// pulled 2 px inside its outline, so neighbours leave a thin seam; the neon edge is the 2 px band between --shape and --shape-in.
+// pulled 1 px inside its outline, so neighbours leave a hairline seam; the neon edge is the 2 px band between --shape and --shape-in.
 const HUD_PLAN = {
   volt:   [[0, 0], [21, 0], [30.5, 38], [0, 38]],
   rpm:    [[21, 0], [79, 0], [67, 48], [33, 48]],
@@ -275,7 +275,7 @@ function layoutHud() {
   for (const [name, plan] of Object.entries(HUD_PLAN)) {
     const el = g.querySelector(".h-" + name); if (!el) continue;
     if (!side || !W || !H) { for (const k of ["left", "top", "width", "height", "--shape", "--shape-in"]) el.style.removeProperty(k); continue; }
-    const px = plan.map(([x, y]) => [x / 100 * W, y / 100 * H]), outer = insetPoly(px, 2), inner = insetPoly(px, 4);
+    const px = plan.map(([x, y]) => [x / 100 * W, y / 100 * H]), outer = insetPoly(px, 1), inner = insetPoly(px, 3);
     const x0 = Math.min(...outer.map(p => p[0])), y0 = Math.min(...outer.map(p => p[1]));
     const x1 = Math.max(...outer.map(p => p[0])), y1 = Math.max(...outer.map(p => p[1]));
     Object.assign(el.style, { left: x0 + "px", top: y0 + "px", width: (x1 - x0) + "px", height: (y1 - y0) + "px" });
@@ -302,12 +302,13 @@ function buildHud() {
 function openHud() {
   if (!hudBuilt) buildHud();
   const h = $("hud"); if (!h.hidden) return;
-  h.hidden = false; requestAnimationFrame(() => h.classList.add("open"));
+  h.hidden = false; layoutHud(); requestAnimationFrame(() => h.classList.add("open"));   // shapes placed before anything shows
   document.documentElement.style.overflow = "hidden";
   history.pushState({ hud: 1 }, "");
   // the map is created after the fade-in, so it never competes with the transition for frames
   setTimeout(hudMapShow, 300);
   if (last) hudRender(last);
+  hudPowerOn();
   clearInterval(hudTimer); hudTimer = setInterval(hudTick, 100);
   $("hudClose").focus({ preventScroll: true });
 }
@@ -386,7 +387,20 @@ function hudTick() {
   $("hLapSub").textContent = !lapStart ? "Tap flag at start line" : lapNo > 1 ? `Last ${mmss(lastLapMs)} · Best ${mmss(best)}` : "Timing first lap";
   const c = $("chip"); $("hStatus").dataset.s = c.dataset.s; $("hStatusT").textContent = $("chipText").textContent;
 }
-let hudLit = -1;
+let hudLit = -1, hudSweep = false;
+// opening the dashboard: panels power on one after another and the tachometer sweeps to the redline and back, like a cluster at ignition
+function hudPowerOn() {
+  const h = $("hud"); if (!h || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  h.classList.remove("poweron"); void h.offsetWidth; h.classList.add("poweron"); setTimeout(() => h.classList.remove("poweron"), 1600);
+  const leds = $("hLeds").querySelectorAll(".led"), n = leds.length, t0 = performance.now(), up = 520, hold = 140, down = 480;
+  hudSweep = true;
+  const step = t => {
+    const e = t - t0, k = e < up ? e / up : e < up + hold ? 1 : Math.max(0, 1 - (e - up - hold) / down), lit = Math.round(n * (1 - Math.pow(1 - k, 2)));
+    leds.forEach((el, i) => el.classList.toggle("on", i < lit));
+    if (e < up + hold + down) requestAnimationFrame(step); else { hudSweep = false; hudLit = -1; if (last) hudRender(last); }
+  };
+  setTimeout(() => requestAnimationFrame(step), 220);
+}
 function hudRender(s) {
   const h = $("hud"); if (!h || h.hidden) return;
   // voltage + charge
@@ -398,7 +412,7 @@ function hudRender(s) {
   $("hKmh").textContent = fmt(s.kmh, 0);
   $("hRpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
   const lit = Math.round(LEDS * Math.max(0, Math.min(1, Math.abs(s.rpm || 0) / RPM_MAX)));
-  if (lit !== hudLit) { hudLit = lit; $("hLeds").querySelectorAll(".led").forEach((el, i) => el.classList.toggle("on", i < lit)); }
+  if (!hudSweep && lit !== hudLit) { hudLit = lit; $("hLeds").querySelectorAll(".led").forEach((el, i) => el.classList.toggle("on", i < lit)); }
   $("hMode").textContent = fin(s.mode) && MODES[s.mode] ? MODES[s.mode] : "Mode --";
   // current: needle plus drive (orange) or regen (green) arc from zero
   const a = fin(s.i) ? Math.max(AMP_MIN, Math.min(AMP_MAX, s.i)) : 0, span = AMP_MAX - AMP_MIN, zf = -AMP_MIN / span;
