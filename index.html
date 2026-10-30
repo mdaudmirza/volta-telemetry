@@ -119,6 +119,8 @@ body[data-tab="drive"] .backbtn { display: none; }
 @keyframes bootGlow { 50% { filter: drop-shadow(0 0 22px rgba(255,138,31,.32)) drop-shadow(0 0 4px rgba(47,191,74,.25)); } }
 @keyframes bootStreak { from { background-position: -50% 0, -40% 37%, -30% 64%; } to { background-position: 150% 0, 140% 37%, 130% 64%; } }
 @media (max-height: 420px) { .boot { gap: 14px; } .boot-sponsor img { height: 24px; } }
+.boot.quick *, .boot.quick::after, .boot.quick .boot-stage::after { animation: none !important; }
+.boot.quick .boot-stage::after { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .boot *, .boot, .boot::after { animation: none !important; transition: none !important; } }
 /* time and date, top centre: full screen hides the phone's own status bar */
 .timebox { position: fixed; z-index: 21; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
@@ -1179,10 +1181,15 @@ $("paintGroup").onclick = e => {
 paintUi();
 // launch screen: shows while the 3D kart loads (the bar is real download progress), then fades into the app by itself
 const bootT0 = performance.now(); let bootReady = false;
+// a reload in the same session (an update arriving, or a Graphics / Paint change) shows the launch screen already drawn and
+// leaves as soon as the kart is ready, so the driver sees one loading screen, not the intro twice
+let bootQuick = false;
+try { bootQuick = sessionStorage.getItem("voltaBooted") === "1"; sessionStorage.setItem("voltaBooted", "1"); } catch (e) {}
+if (bootQuick) $("boot").classList.add("quick");
 const bootProgress = f => { $("bootBar").style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + "%"; };
 function bootDone() {
   if (bootReady) return; bootReady = true; bootProgress(1);
-  setTimeout(() => { $("boot").classList.add("out"); setTimeout(() => $("boot").remove(), 600); }, Math.max(0, 2300 - (performance.now() - bootT0)));
+  setTimeout(() => { $("boot").classList.add("out"); setTimeout(() => $("boot").remove(), 600); }, bootQuick ? 0 : Math.max(0, 2300 - (performance.now() - bootT0)));
 }
 window.addEventListener("kartprogress", e => bootProgress(e.detail));
 window.addEventListener("kartready", bootDone);
