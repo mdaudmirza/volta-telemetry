@@ -183,3 +183,54 @@ button.hp:focus-visible { outline: none; background: #fff; }
   background: rgba(10,11,13,.82); color: var(--h-fg); font: 600 16px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; cursor: pointer; }
 .mfback svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .mapfull .mapui.br { bottom: calc(28px + env(safe-area-inset-bottom, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); }
+
+/* ---------- cyber-racing look (after the team's reference image), in the app's colours ----------
+   Neon edges follow the drive mode (Eco green, Drive PARCO orange, Sport red); the tachometer runs green -> orange -> red;
+   crimson marks where the speed gauge meets the map. Squared digits: Chakra Petch. */
+.hud { --h-digit: "Chakra Petch", var(--font); --h-edge: var(--h-acc); --h-edge2: rgba(var(--mode-rgb, 255,138,31),.35);
+  background: radial-gradient(120% 90% at 50% 40%, rgba(24,26,31,.55), rgba(5,6,8,.96) 72%),
+    repeating-linear-gradient(45deg, #0a0b0d 0 3px, #101115 3px 6px); }
+.hud-grid::before { background: radial-gradient(closest-side, rgba(var(--mode-rgb, 255,138,31),.18), transparent); }
+.hp { padding: 2px; background: linear-gradient(var(--g-dir, 135deg), var(--h-edge2), var(--h-edge2) 40%, var(--h-edge)); }   /* warning / fault edges still override the colours */
+.hp > .in { background: linear-gradient(160deg, #1b1e22, #0c0d10 70%);
+  box-shadow: inset 0 0 22px rgba(var(--mode-rgb, 255,138,31),.16), inset 0 0 2px rgba(var(--mode-rgb, 255,138,31),.6); }
+/* segmented bracket marks along each panel's top edge */
+.hp > .in::before { content: ""; position: absolute; z-index: 2; top: 6px; left: 26px; width: 46px; height: 3px; pointer-events: none;
+  background: repeating-linear-gradient(90deg, var(--h-acc) 0 8px, transparent 8px 12px); filter: drop-shadow(0 0 4px var(--h-acc)); opacity: .9; }
+.h-amps > .in::before, .h-temps > .in::before, .h-pedals > .in::before { left: auto; right: 26px; }
+.h-rpm > .in::before, .h-map > .in::before { display: none; }
+/* squared digital readouts */
+.hv, .spdc .big, .tg .t, .h-lap .hv { font-family: var(--h-digit); font-weight: 700; letter-spacing: 0; }
+.hv { text-shadow: 0 0 14px rgba(255,255,255,.18); }
+.rpmg text, .ampg text { font-family: var(--h-digit); font-weight: 600; }
+.vscale, .ped .r, .hs { font-family: var(--h-digit); }
+/* LED tachometer */
+.rpmg .trk { stroke-width: 3; stroke: rgba(255,255,255,.14); }
+.rpmg .red { stroke-width: 3; stroke: #ff453a; filter: drop-shadow(0 0 4px #ff453a); }
+.rpmg .led { stroke-width: 4.2; stroke-linecap: butt; opacity: .16; transition: opacity .12s; }
+.rpmg .led.g { stroke: #2fbf4a; } .rpmg .led.a { stroke: #ff8a1f; } .rpmg .led.r { stroke: #ff453a; }
+.rpmg .led.on { opacity: 1; filter: drop-shadow(0 0 3px currentColor); }
+.rpmg .led.g.on { color: #2fbf4a; } .rpmg .led.a.on { color: #ff8a1f; } .rpmg .led.r.on { color: #ff453a; }
+.spdc .big { text-shadow: 0 0 18px rgba(255,255,255,.25); }
+.h-rpm { background: linear-gradient(180deg, var(--h-edge2), var(--h-edge) 55%, #ff453a); }
+.h-rpm > .in::after { content: ""; position: absolute; left: 50%; bottom: 7px; width: 34%; height: 2px; transform: translateX(-50%); pointer-events: none;
+  background: linear-gradient(90deg, transparent, #ff453a, transparent); filter: drop-shadow(0 0 6px #ff453a); }
+/* current and temperature gauges glow */
+.ampg .val, .tg .val { filter: drop-shadow(0 0 4px currentColor); }
+.ampg .val { color: var(--h-acc); } .ampg .val.regen { color: var(--h-ok); } .tg .val { color: #ff8a1f; }
+/* hexagon map frame, tactical green map with a faint grid */
+.h-map { --hx: 38px; --shape: polygon(var(--hx) 0, calc(100% - var(--hx)) 0, 100% 50%, calc(100% - var(--hx)) 100%, var(--hx) 100%, 0 50%);
+  background: linear-gradient(0deg, var(--h-edge), var(--h-edge2) 45%, #ff453a); }
+.h-map .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.62) contrast(1.15) sepia(.55) hue-rotate(58deg) saturate(1.7); }
+.h-map > .in::after { content: ""; position: absolute; inset: 0; z-index: 450; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(47,191,74,.06) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(47,191,74,.06) 0 1px, transparent 1px 28px);
+  box-shadow: inset 0 0 40px rgba(0,0,0,.7); }
+.h-map .mapui.tl { left: calc(var(--hx) + 10px); } .h-map .mapui.br { right: calc(var(--hx) + 6px); }
+/* throttle green, regen crimson, both glowing */
+#hThr { background: #2fbf4a; box-shadow: 0 0 8px rgba(47,191,74,.7); }
+#hRegen { background: #ff453a; box-shadow: 0 0 8px rgba(255,69,58,.7); }
+#hKwBar { box-shadow: 0 0 8px currentColor; }
+.vsegs i.on { box-shadow: 0 0 6px currentColor; color: var(--h-acc); }
+.vsegs i.on.low { color: var(--h-crit); } .vsegs i.on.mid { color: var(--h-warn); }
+/* upright phone: the map is a full-width row, a smaller point keeps it readable */
+@media (max-aspect-ratio: 1/1) { .h-map { --hx: 24px; } }

@@ -158,6 +158,7 @@ const ARC = (cx, cy, r, a0, a1) => {                          // SVG arc from an
   const [x0, y0] = p(a0), [x1, y1] = p(a1), large = Math.abs(a0 - a1) > 180 ? 1 : 0, sweep = a0 > a1 ? 1 : 0;
   return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 ${large} ${sweep} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
 };
+const LEDS = 60;
 function rpmSvg() {
   const cx = 150, cy = 130, r = 118, A = f => 210 - 240 * f, red = RPM_RED / RPM_MAX;
   let ticks = "";
@@ -166,9 +167,15 @@ function rpmSvg() {
     ticks += `<line class="tick${major ? "" : " minor"}" x1="${(cx + r0 * Math.cos(a)).toFixed(1)}" y1="${(cy - r0 * Math.sin(a)).toFixed(1)}" x2="${(cx + r1 * Math.cos(a)).toFixed(1)}" y2="${(cy - r1 * Math.sin(a)).toFixed(1)}"/>`;
     if (major) ticks += `<text x="${(cx + (r - 40) * Math.cos(a)).toFixed(1)}" y="${(cy - (r - 40) * Math.sin(a)).toFixed(1)}">${k}</text>`;
   }
+  // LED ring: short radial segments that light up to the rpm, green -> PARCO orange -> red in the red zone
+  let leds = "";
+  for (let i = 0; i < LEDS; i++) {
+    const f = (i + 0.5) / LEDS, a = A(f) * Math.PI / 180, r0 = r + 3, r1 = r + 15, c = f >= red ? "r" : f >= 0.6 ? "a" : "g";
+    leds += `<line class="led ${c}" x1="${(cx + r0 * Math.cos(a)).toFixed(1)}" y1="${(cy - r0 * Math.sin(a)).toFixed(1)}" x2="${(cx + r1 * Math.cos(a)).toFixed(1)}" y2="${(cy - r1 * Math.sin(a)).toFixed(1)}"/>`;
+  }
   return `<svg class="rpmg" viewBox="0 0 300 195" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-    <path class="trk" d="${ARC(cx, cy, r, A(0), A(1))}"/><path class="red" d="${ARC(cx, cy, r, A(red), A(1))}"/>
-    <path class="val" id="hRpmArc" d="${ARC(cx, cy, r, A(0), A(1))}" pathLength="100"/>${ticks}</svg>`;
+    <path class="trk" d="${ARC(cx, cy, r - 4, A(0), A(1))}"/><path class="red" d="${ARC(cx, cy, r - 4, A(red), A(1))}"/>
+    <g id="hLeds">${leds}</g>${ticks}</svg>`;
 }
 const AMP_MIN = -40, AMP_MAX = 160;
 function ampSvg() {
@@ -338,6 +345,7 @@ function hudTick() {
   $("hLapSub").textContent = !lapStart ? "Tap flag at start line" : lapNo > 1 ? `Last ${mmss(lastLapMs)} · Best ${mmss(best)}` : "Timing first lap";
   const c = $("chip"); $("hStatus").dataset.s = c.dataset.s; $("hStatusT").textContent = $("chipText").textContent;
 }
+let hudLit = -1;
 function hudRender(s) {
   const h = $("hud"); if (!h || h.hidden) return;
   // voltage + charge
@@ -348,7 +356,8 @@ function hudRender(s) {
   // speed + rpm
   $("hKmh").textContent = fmt(s.kmh, 0);
   $("hRpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
-  $("hRpmArc").style.strokeDashoffset = 100 - 100 * Math.max(0, Math.min(1, Math.abs(s.rpm || 0) / RPM_MAX));
+  const lit = Math.round(LEDS * Math.max(0, Math.min(1, Math.abs(s.rpm || 0) / RPM_MAX)));
+  if (lit !== hudLit) { hudLit = lit; $("hLeds").querySelectorAll(".led").forEach((el, i) => el.classList.toggle("on", i < lit)); }
   $("hMode").textContent = fin(s.mode) && MODES[s.mode] ? MODES[s.mode] : "Mode --";
   // current: needle plus drive (orange) or regen (green) arc from zero
   const a = fin(s.i) ? Math.max(AMP_MIN, Math.min(AMP_MAX, s.i)) : 0, span = AMP_MAX - AMP_MIN, zf = -AMP_MIN / span;
