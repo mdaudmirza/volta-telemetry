@@ -257,14 +257,26 @@ button.hp:focus-visible { outline: none; background: #fff; }
 .interlock .h-map .mapui.tl { left: 22%; top: 12px; } .interlock .h-map .mapui.br { right: 21%; bottom: 12px; }
 .interlock .h-volt .hl { width: min-content; }                /* "Battery / voltage" on two lines, clear of the slanted edge */
 
-/* dashboard power-on: each panel flickers on in turn (centre first, then outwards) */
+/* dashboard start-up, like the VOLTA preview video */
+.hud-tell { position: fixed; z-index: 31; left: 50%; top: max(12px, env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: none; gap: 10px; pointer-events: none; }
+.hud-tell svg { width: 18px; height: 18px; fill: none; stroke: #ff453a; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 5px #ff453a); }
+.hud.poweron .hud-tell { display: flex; animation: tellOn 1.6s steps(1, end) both; }
+@keyframes tellOn { 0% { opacity: 0; } 10% { opacity: 1; } 22% { opacity: .15; } 32% { opacity: 1; } 42% { opacity: .3; } 50% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+.hud-trace { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; overflow: visible; opacity: 0; }
+.hud-trace polygon { fill: none; stroke: var(--h-acc); stroke-width: 2; stroke-linejoin: round; filter: drop-shadow(0 0 5px var(--h-acc));
+  stroke-dasharray: var(--len); stroke-dashoffset: var(--len); }
+.hud-trace polygon.red { stroke: #ff453a; filter: drop-shadow(0 0 6px #ff453a); }
+.hud.poweron .hud-trace { animation: traceLayer 2.2s ease both; }
+.hud.poweron .hud-trace polygon { animation: traceDraw .55s calc(.55s + var(--d)) cubic-bezier(.65,0,.35,1) both; }
+@keyframes traceDraw { to { stroke-dashoffset: 0; } }
+@keyframes traceLayer { 0%, 22% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 .hud.poweron .hp { animation: hpOn .6s cubic-bezier(.2,.8,.2,1) both; }
-.hud.poweron .h-rpm { animation-delay: .05s; } .hud.poweron .h-map { animation-delay: .18s; }
-.hud.poweron .h-volt, .hud.poweron .h-amps { animation-delay: .3s; } .hud.poweron .h-power, .hud.poweron .h-temps { animation-delay: .42s; }
-.hud.poweron .h-lap, .hud.poweron .h-pedals { animation-delay: .54s; }
+.hud.poweron .h-rpm { animation-delay: 1s; } .hud.poweron .h-map { animation-delay: 1.06s; }
+.hud.poweron .h-volt, .hud.poweron .h-amps { animation-delay: 1.12s; } .hud.poweron .h-power, .hud.poweron .h-temps { animation-delay: 1.18s; }
+.hud.poweron .h-lap, .hud.poweron .h-pedals { animation-delay: 1.24s; }
 @keyframes hpOn {
-  0% { opacity: 0; filter: brightness(2.4) saturate(0); transform: scale(.97); }
-  25% { opacity: .85; } 35% { opacity: .2; } 50% { opacity: 1; filter: brightness(1.7) saturate(.6); }
+  0% { opacity: 0; filter: brightness(2.4) saturate(0); transform: scale(.985); }
+  30% { opacity: .9; } 42% { opacity: .25; } 56% { opacity: 1; filter: brightness(1.6) saturate(.7); }
   100% { opacity: 1; filter: none; transform: none; } }
 
 /* ---------- harmony of the earlier clean dashboard and the cyber reference, in PARCO colours ----------

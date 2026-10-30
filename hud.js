@@ -202,7 +202,7 @@ function tempSvg(id) {
 const SEGS = 20;
 function hudMarkup() {
   return `<section class="hud" id="hud" role="dialog" aria-modal="true" aria-label="Dashboard" hidden>
-  <div class="hud-grid">
+  <div class="hud-grid"><svg class="hud-trace" id="hTrace" aria-hidden="true"></svg>
     <button class="hp h-volt cut-br" type="button" data-part="battery" aria-label="Battery details"><div class="in">
       <div class="vscale"><span>${V_MAX}</span><span>${Math.round((V_MAX + V_MIN) / 2)}</span><span>${V_MIN}</span></div>
       <div class="vsegs" id="hSegs">${"<i></i>".repeat(SEGS)}</div>
@@ -238,6 +238,11 @@ function hudMarkup() {
   </div>
   <button class="hud-close" type="button" id="hudClose" aria-label="Close dashboard"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   <div class="hud-alert" id="hAlert" role="status" hidden><span id="hAlertT"></span></div>
+  <div class="hud-tell" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="1.5"/><path d="M21 10.5v3M7 12h5"/></svg>
+    <svg viewBox="0 0 24 24"><path d="M13 3L6 13.5h5L10 21l7-10.5h-5z"/></svg>
+    <svg viewBox="0 0 24 24"><path d="M12 3v11.5M9.5 14.6a3.6 3.6 0 1 0 5 0V5.5a2.5 2.5 0 0 0-5 0z"/><path d="M15.5 7h3M15.5 10h3"/></svg>
+  </div>
   <div class="hud-status" id="hStatus" data-s="idle"><span class="dot"></span><span id="hStatusT"></span></div>
 </section>`;
 }
@@ -281,6 +286,13 @@ function layoutHud() {
     Object.assign(el.style, { left: x0 + "px", top: y0 + "px", width: (x1 - x0) + "px", height: (y1 - y0) + "px" });
     el.style.setProperty("--shape", polyCss(outer, x0, y0)); el.style.setProperty("--shape-in", polyCss(inner, x0 + 2, y0 + 2));
   }
+  // the start-up outlines: one polygon per panel, drawn in on opening (crimson for the speed gauge and map, like the seam between them)
+  const tr = $("hTrace");
+  if (tr) tr.innerHTML = !side || !W ? "" : Object.entries(HUD_PLAN).map(([name, plan], i) => {
+    const pts = insetPoly(plan.map(([x, y]) => [x / 100 * W, y / 100 * H]), 1); let len = 0;
+    pts.forEach((p, j) => { const q = pts[(j + 1) % pts.length]; len += Math.hypot(q[0] - p[0], q[1] - p[1]); });
+    return `<polygon class="${name === "rpm" || name === "map" ? "red" : ""}" style="--len:${len.toFixed(0)};--d:${i * 55}ms" points="${pts.map(p => p.map(v => v.toFixed(1)).join(",")).join(" ")}"/>`;
+  }).join("");
   if (hudMap) hudMap.resize();                                  // the map redraws for its new size
 }
 window.addEventListener("resize", () => { if (hudBuilt) layoutHud(); });
@@ -391,15 +403,21 @@ let hudLit = -1, hudSweep = false;
 // opening the dashboard: panels power on one after another and the tachometer sweeps to the redline and back, like a cluster at ignition
 function hudPowerOn() {
   const h = $("hud"); if (!h || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  h.classList.remove("poweron"); void h.offsetWidth; h.classList.add("poweron"); setTimeout(() => h.classList.remove("poweron"), 1600);
-  const leds = $("hLeds").querySelectorAll(".led"), n = leds.length, t0 = performance.now(), up = 520, hold = 140, down = 480;
-  hudSweep = true;
-  const step = t => {
-    const e = t - t0, k = e < up ? e / up : e < up + hold ? 1 : Math.max(0, 1 - (e - up - hold) / down), lit = Math.round(n * (1 - Math.pow(1 - k, 2)));
-    leds.forEach((el, i) => el.classList.toggle("on", i < lit));
-    if (e < up + hold + down) requestAnimationFrame(step); else { hudSweep = false; hudLit = -1; if (last) hudRender(last); }
-  };
-  setTimeout(() => requestAnimationFrame(step), 220);
+  // like the preview video: telltales blink (0-0.9 s), outlines draw in (0.55-1.2 s), panels light (from 1.0 s),
+  // then the tachometer fills to the redline and settles while the speed counts up (from 1.2 s)
+  h.classList.remove("poweron"); void h.offsetWidth; h.classList.add("poweron"); setTimeout(() => h.classList.remove("poweron"), 2500);
+  const leds = $("hLeds").querySelectorAll(".led"), n = leds.length, up = 480, hold = 110, down = 420, kmh = $("hKmh");
+  hudSweep = true; leds.forEach(el => el.classList.remove("on")); kmh.textContent = "0";
+  setTimeout(() => {
+    const t0 = performance.now(), target = last && fin(last.kmh) ? Math.round(last.kmh) : 0;
+    const step = t => {
+      const e = t - t0, k = e < up ? e / up : e < up + hold ? 1 : Math.max(0, 1 - (e - up - hold) / down), lit = Math.round(n * (1 - Math.pow(1 - k, 2)));
+      leds.forEach((el, i) => el.classList.toggle("on", i < lit));
+      kmh.textContent = Math.round(target * Math.min(1, e / (up + hold)));
+      if (e < up + hold + down) requestAnimationFrame(step); else { hudSweep = false; hudLit = -1; if (last) hudRender(last); }
+    };
+    requestAnimationFrame(step);
+  }, 1200);
 }
 function hudRender(s) {
   const h = $("hud"); if (!h || h.hidden) return;
@@ -409,7 +427,7 @@ function hudRender(s) {
   $("hSegs").querySelectorAll("i").forEach((el, i) => { el.className = i < on ? (i < 3 ? "on low" : i < 6 ? "on mid" : "on") : ""; });
   $("hSoc").textContent = `SoC ${fmt(s.soc, 0)}%`; $("hRange").textContent = `Range ~${fin(rangeKm) ? fmt(rangeKm, rangeKm < 10 ? 1 : 0) : "--"} km`;
   // speed + rpm
-  $("hKmh").textContent = fmt(s.kmh, 0);
+  if (!hudSweep) $("hKmh").textContent = fmt(s.kmh, 0);
   $("hRpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
   const lit = Math.round(LEDS * Math.max(0, Math.min(1, Math.abs(s.rpm || 0) / RPM_MAX)));
   if (!hudSweep && lit !== hudLit) { hudLit = lit; $("hLeds").querySelectorAll(".led").forEach((el, i) => el.classList.toggle("on", i < lit)); }
