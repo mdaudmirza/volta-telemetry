@@ -239,3 +239,20 @@ button.hp:focus-visible { outline: none; background: #fff; }
 .h-map { --shape: polygon(calc(2.4 * var(--h-c)) 0, calc(100% - 2.4 * var(--h-c)) 0, 100% calc(1.6 * var(--h-c)), 100% calc(100% - var(--h-c)),
   calc(100% - var(--h-c)) 100%, var(--h-c) 100%, 0 calc(100% - var(--h-c)), 0 calc(1.6 * var(--h-c))); }
 .h-map .mapui.tl { left: 14px; } .h-map .mapui.br { right: 12px; }
+
+/* sideways: interlocking panels (positions and shapes set by layoutHud in hud.js) */
+.hud-grid.interlock { display: block; }
+.hud-grid.interlock > .hp { position: absolute; }
+.hud-grid.interlock > .hp > .in { clip-path: var(--shape-in, var(--shape)); }
+.hud-grid.interlock::before { inset: 20% 30%; }
+/* keep each panel's contents inside the part of its box its shape leaves free */
+.interlock .h-power .in { padding-right: 32%; }
+.interlock .h-lap .in { padding-right: 24%; }
+.interlock .h-temps .in { padding-left: 31%; }
+.interlock .h-pedals .in { padding-left: 24%; }
+.interlock .h-amps .ampg { left: 26%; width: calc(74% - 6px); }
+.interlock .h-amps .ampc { left: 26%; }
+.interlock .h-amps .hl.top { left: auto; right: 16px; }
+.interlock .h-amps > .in::before { right: 16px; top: auto; bottom: 8px; }
+.interlock .h-map .mapui.tl { left: 22%; top: 12px; } .interlock .h-map .mapui.br { right: 21%; bottom: 12px; }
+.interlock .h-volt .hl { width: min-content; }                /* "Battery / voltage" on two lines, clear of the slanted edge */

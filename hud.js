@@ -244,6 +244,46 @@ function hudMarkup() {
 
 // ---------- open / close ----------
 let hudMap = null, hudBuilt = false, hudTimer = null;
+// Sideways the panels interlock like the team's reference: each is a polygon on one shared plan (percent of the dashboard),
+// the speed gauge a trapezoid, the map a hexagon under it, the others wrapped around their slanted sides. Every polygon is
+// pulled 2 px inside its outline, so neighbours leave a thin seam; the neon edge is the 2 px band between --shape and --shape-in.
+const HUD_PLAN = {
+  volt:   [[0, 0], [21, 0], [30.5, 38], [0, 38]],
+  rpm:    [[21, 0], [79, 0], [67, 48], [33, 48]],
+  amps:   [[79, 0], [100, 0], [100, 38], [69.5, 38]],
+  power:  [[0, 38], [30.5, 38], [33, 48], [22, 79], [0, 79]],
+  map:    [[33, 48], [67, 48], [78, 79], [72, 100], [28, 100], [22, 79]],
+  temps:  [[69.5, 38], [100, 38], [100, 79], [78, 79], [67, 48]],
+  lap:    [[0, 79], [22, 79], [28, 100], [0, 100]],
+  pedals: [[78, 79], [100, 79], [100, 100], [72, 100]],
+};
+function insetPoly(pts, d) {                                  // a convex polygon moved d px inwards on every side
+  const n = pts.length; let area = 0;
+  for (let i = 0; i < n; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % n]; area += x0 * y1 - x1 * y0; }
+  const sg = area > 0 ? 1 : -1;
+  const lines = pts.map((p, i) => { const q = pts[(i + 1) % n], dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy) || 1;
+    return { x: p[0] - sg * dy / len * d, y: p[1] + sg * dx / len * d, dx, dy }; });
+  return lines.map((b, i) => { const a = lines[(i + n - 1) % n], den = a.dx * b.dy - a.dy * b.dx;
+    if (Math.abs(den) < 1e-9) return [b.x, b.y];
+    const t = ((b.x - a.x) * b.dy - (b.y - a.y) * b.dx) / den; return [a.x + t * a.dx, a.y + t * a.dy]; });
+}
+const polyCss = (pts, ox, oy) => `polygon(${pts.map(([x, y]) => `${(x - ox).toFixed(1)}px ${(y - oy).toFixed(1)}px`).join(", ")})`;
+function layoutHud() {
+  const g = document.querySelector(".hud-grid"); if (!g) return;
+  const side = matchMedia("(min-aspect-ratio: 1/1)").matches, W = g.clientWidth, H = g.clientHeight;
+  g.classList.toggle("interlock", side);
+  for (const [name, plan] of Object.entries(HUD_PLAN)) {
+    const el = g.querySelector(".h-" + name); if (!el) continue;
+    if (!side || !W || !H) { for (const k of ["left", "top", "width", "height", "--shape", "--shape-in"]) el.style.removeProperty(k); continue; }
+    const px = plan.map(([x, y]) => [x / 100 * W, y / 100 * H]), outer = insetPoly(px, 2), inner = insetPoly(px, 4);
+    const x0 = Math.min(...outer.map(p => p[0])), y0 = Math.min(...outer.map(p => p[1]));
+    const x1 = Math.max(...outer.map(p => p[0])), y1 = Math.max(...outer.map(p => p[1]));
+    Object.assign(el.style, { left: x0 + "px", top: y0 + "px", width: (x1 - x0) + "px", height: (y1 - y0) + "px" });
+    el.style.setProperty("--shape", polyCss(outer, x0, y0)); el.style.setProperty("--shape-in", polyCss(inner, x0 + 2, y0 + 2));
+  }
+  if (hudMap) hudMap.resize();                                  // the map redraws for its new size
+}
+window.addEventListener("resize", () => { if (hudBuilt) layoutHud(); });
 function buildHud() {
   document.body.insertAdjacentHTML("beforeend", hudMarkup()); hudBuilt = true;
   $("hud").addEventListener("click", e => { const b = e.target.closest("[data-part]"); if (b) openPart(b.dataset.part); });
@@ -257,6 +297,7 @@ function buildHud() {
   $("hMode").addEventListener("click", e => { e.stopPropagation(); cycleMode(); });
   $("hMode").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); cycleMode(); } });
   $("hKwZero").style.left = (-KW_MIN / (KW_MAX - KW_MIN) * 100) + "%";
+  new ResizeObserver(layoutHud).observe(document.querySelector(".hud-grid")); layoutHud();
 }
 function openHud() {
   if (!hudBuilt) buildHud();
