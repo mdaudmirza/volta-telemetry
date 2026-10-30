@@ -97,7 +97,29 @@ body[data-tab="drive"] .backbtn { display: none; }
 @keyframes bootFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes bootDraw { from { clip-path: inset(0 100% 0 0); opacity: .2; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
 @keyframes bootRise { from { opacity: 0; transform: translate(-50%, -12%); } to { opacity: 1; transform: translate(-50%, -46%); } }
-@media (prefers-reduced-motion: reduce) { .boot *, .boot { animation: none !important; transition: none !important; } }
+/* the cool bits, in PARCO colours: speed streaks, a light sweep as the kart draws in, an outlined VOLTA, the sponsor, a launch on exit */
+.boot::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background: repeating-linear-gradient(180deg, transparent 0 46px, rgba(255,138,31,.07) 46px 47px, transparent 47px 90px, rgba(47,191,74,.05) 90px 91px);
+  -webkit-mask: radial-gradient(60% 45% at 50% 50%, #000, transparent); mask: radial-gradient(60% 45% at 50% 50%, #000, transparent); }
+.boot::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .55; animation: bootStreak 1.6s linear infinite;
+  background: linear-gradient(90deg, transparent 0 40%, rgba(255,255,255,.05) 50%, transparent 60% 100%) 0 0 / 50% 3px repeat-y,
+    linear-gradient(90deg, transparent 0 30%, rgba(255,138,31,.12) 50%, transparent 70% 100%) 0 37% / 35% 1px no-repeat,
+    linear-gradient(90deg, transparent 0 30%, rgba(47,191,74,.1) 50%, transparent 70% 100%) 0 64% / 28% 1px no-repeat; }
+.boot > * { position: relative; z-index: 1; }
+.boot-stage::after { content: ""; position: absolute; top: 4%; bottom: 4%; width: 3px; left: 0; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, #ff8a1f 30%, #fff 50%, #ff8a1f 70%, transparent); box-shadow: 0 0 18px 4px rgba(255,138,31,.55);
+  animation: bootSweep 1.2s .35s cubic-bezier(.65,0,.35,1) both; }
+.boot-word { color: #121316; -webkit-text-stroke: 1px rgba(255,138,31,.28); }
+.boot-kart { animation: bootDraw 1.2s .35s cubic-bezier(.65,0,.35,1) both, bootGlow 2.4s 1.6s ease-in-out infinite; }
+.boot-bar i { background: linear-gradient(90deg, #ff8a1f, #2fbf4a); box-shadow: 0 0 10px rgba(255,138,31,.7); }
+.boot-sponsor { display: grid; justify-items: center; gap: 6px; animation: bootFade .6s 1.3s ease both; }
+.boot-sponsor img { height: 30px; width: auto; filter: drop-shadow(0 0 10px rgba(255,138,31,.35)); }
+.boot.out .boot-kart { transform: translateX(-14%) scale(1.06); filter: blur(1.5px) drop-shadow(0 0 24px rgba(255,138,31,.6)); transition: transform .55s cubic-bezier(.5,0,.75,0), filter .55s; }
+@keyframes bootSweep { 0% { left: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+@keyframes bootGlow { 50% { filter: drop-shadow(0 0 22px rgba(255,138,31,.32)) drop-shadow(0 0 4px rgba(47,191,74,.25)); } }
+@keyframes bootStreak { from { background-position: -50% 0, -40% 37%, -30% 64%; } to { background-position: 150% 0, 140% 37%, 130% 64%; } }
+@media (max-height: 420px) { .boot { gap: 14px; } .boot-sponsor img { height: 24px; } }
+@media (prefers-reduced-motion: reduce) { .boot *, .boot, .boot::after { animation: none !important; transition: none !important; } }
 /* time and date, top centre: full screen hides the phone's own status bar */
 .timebox { position: fixed; z-index: 21; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: grid; justify-items: center; pointer-events: none; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
@@ -414,6 +436,7 @@ body.sheet-open .sheet { transform: none; }
   <p class="boot-pre">Sonic Engineering presents</p>
   <div class="boot-stage"><span class="boot-word" aria-hidden="true">VOLTA</span><img class="boot-kart" src="kart-line.png" alt="VOLTA kart"></div>
   <div class="boot-bar" aria-hidden="true"><i id="bootBar"></i></div>
+  <div class="boot-sponsor"><img src="parco-logo.png" alt="PARCO"></div>
 </div>
 <div class="app" id="app">
   <!-- floating bar: menu, clock and date (the phone's own status bar is hidden in full screen), connection status -->
