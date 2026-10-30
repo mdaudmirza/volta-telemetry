@@ -88,11 +88,6 @@ body[data-tab="drive"] .backbtn { display: none; }
 .boot-kart { position: relative; width: 100%; height: auto; filter: drop-shadow(0 0 18px rgba(255,255,255,.12)); animation: bootDraw 1.2s .35s cubic-bezier(.65,0,.35,1) both; }
 .boot-bar { width: 180px; height: 2px; background: rgba(255,255,255,.08); overflow: hidden; animation: bootFade .5s .6s ease both; }
 .boot-bar i { display: block; width: 0; height: 100%; background: #ff8a1f; box-shadow: 0 0 10px #ff8a1f; transition: width .3s ease; }
-.boot-start { min-width: 168px; min-height: 52px; padding: 0 28px; border: 0; background: #ff8a1f; color: #0b0c0e; font: 700 15px "Chakra Petch", var(--font);
-  letter-spacing: .32em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 28px rgba(255,138,31,.35); animation: bootFade .45s ease both;
-  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
-.boot-start:active { transform: scale(.97); }
-.boot:has(.boot-start:not([hidden])) .boot-bar { visibility: hidden; }   /* START takes the bar's place */
 @keyframes bootFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes bootDraw { from { clip-path: inset(0 100% 0 0); opacity: .2; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
 @keyframes bootRise { from { opacity: 0; transform: translate(-50%, -12%); } to { opacity: 1; transform: translate(-50%, -46%); } }
@@ -406,12 +401,11 @@ body.sheet-open .sheet { transform: none; }
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 </svg>
 
-<!-- launch screen, like the team website's intro: the kart drawn in, VOLTA rising behind it, then START -->
+<!-- launch screen, like the team website's intro: the kart drawn in, VOLTA rising behind it, then it fades into the app -->
 <div class="boot" id="boot" role="dialog" aria-label="VOLTA is starting">
   <p class="boot-pre">Sonic Engineering presents</p>
   <div class="boot-stage"><span class="boot-word" aria-hidden="true">VOLTA</span><img class="boot-kart" src="kart-line.png" alt="VOLTA kart"></div>
   <div class="boot-bar" aria-hidden="true"><i id="bootBar"></i></div>
-  <button class="boot-start" id="bootStart" type="button" hidden>Start</button>
 </div>
 <div class="app" id="app">
   <!-- floating bar: menu, clock and date (the phone's own status bar is hidden in full screen), connection status -->
@@ -1152,17 +1146,16 @@ $("paintGroup").onclick = e => {
   store.set("paint", b.dataset.v); paintUi(); toast("Applying paint…"); setTimeout(() => location.reload(), 500);
 };
 paintUi();
-// launch screen: shows while the 3D kart loads (the bar is real download progress), then START, which also goes full screen
+// launch screen: shows while the 3D kart loads (the bar is real download progress), then fades into the app by itself
 const bootT0 = performance.now(); let bootReady = false;
 const bootProgress = f => { $("bootBar").style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + "%"; };
 function bootDone() {
   if (bootReady) return; bootReady = true; bootProgress(1);
-  setTimeout(() => { $("bootStart").hidden = false; $("bootStart").focus({ preventScroll: true }); }, Math.max(0, 2300 - (performance.now() - bootT0)));
+  setTimeout(() => { $("boot").classList.add("out"); setTimeout(() => $("boot").remove(), 600); }, Math.max(0, 2300 - (performance.now() - bootT0)));
 }
 window.addEventListener("kartprogress", e => bootProgress(e.detail));
 window.addEventListener("kartready", bootDone);
 setTimeout(bootDone, 9000);                                                  // never keep the driver waiting longer than this
-$("bootStart").onclick = () => { $("boot").classList.add("out"); setTimeout(() => $("boot").remove(), 600); };   // the tap also goes full screen (handler below)
 // clock and date: full screen hides the phone's own status bar
 function tickClock() {
   const d = new Date();
