@@ -287,3 +287,35 @@ button.hp:focus-visible { outline: none; background: #fff; }
   repeating-linear-gradient(90deg, rgba(255,138,31,.05) 0 1px, transparent 1px 28px); box-shadow: inset 0 0 36px rgba(0,0,0,.6); }
 .rpmg .led.g { stroke: var(--h-acc); } .rpmg .led.g.on { color: var(--h-acc); }
 #hThr { background: var(--h-acc); box-shadow: 0 0 8px var(--h-acc); }
+
+/* smaller close button; the battery panel's contents sit further left, clear of the speed gauge's slanted edge */
+.hud-close { width: 30px; height: 30px; top: max(8px, env(safe-area-inset-top, 0px)); left: max(8px, env(safe-area-inset-left, 0px)); }
+.hud-close svg { width: 14px; height: 14px; }
+@media (min-aspect-ratio: 1/1) { .h-volt .in { padding-left: 30px; gap: 8px; } }
+.interlock .h-volt .hv { font-size: clamp(20px, min(3.2vw, 8vh), 36px); }
+/* the dashboard map is one big button to the full-screen map */
+.maptap { position: absolute; inset: 0; z-index: 550; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.maptap:focus-visible { outline: 2px solid var(--h-acc); outline-offset: -4px; }
+/* swapped panels: throttle/regen in the middle-right panel, temperatures in the bottom-right one */
+.hud-grid { grid-template-areas: "volt rpm amps" "power map pedals" "lap map temps"; }
+.interlock .h-pedals .in { padding: 10px 16px 10px 31%; gap: 14px; }
+.interlock .h-temps .in { padding: 4px 10px 4px 24%; grid-template-columns: 1fr 1fr; }
+.interlock .h-temps .tg { grid-template-columns: auto 1fr; align-items: center; justify-items: start; column-gap: 4px; }
+.interlock .h-temps .tg svg { width: auto; height: min(100%, 64px); max-width: 64px; grid-row: span 2; }
+.interlock .h-temps .tg .hl { margin: 0; font-size: 10px; letter-spacing: .1em; }
+.interlock .h-temps > .in::before { right: 26px; left: auto; }
+.interlock .h-pedals > .in::before { right: 26px; left: auto; }
+/* longer throttle and regen bars */
+.ped { grid-template-columns: auto minmax(0, 1fr) 46px; gap: 10px; }
+.ped .hl { min-width: 0; }
+.ped .hbar { height: 12px; }
+@media (max-aspect-ratio: 1/1) { .hud-grid { grid-template-areas: "rpm rpm" "map map" "volt amps" "power pedals" "lap temps"; } }
+/* throttle / regen: label and value on top, the bar across the whole panel */
+.interlock .h-pedals .in { padding: 10px 22px 10px 19%; gap: 12px; }
+.interlock .h-pedals .ped { grid-template-columns: 1fr auto; row-gap: 6px; }
+.interlock .h-pedals .ped .hbar { grid-column: 1 / -1; grid-row: 2; height: 14px; }
+/* temperatures in the bottom-right panel: each dial over its label */
+.interlock .h-temps .tg { grid-template-columns: 1fr; justify-items: center; row-gap: 0; }
+.interlock .h-temps .tg svg { height: clamp(40px, 12vh, 60px); width: auto; max-width: none; grid-row: auto; }
+.interlock .h-temps .tg .hl { font-size: 9px; text-align: center; line-height: 1.15; }
+.interlock .h-temps .tg .st { min-height: 0; font-size: 9px; }

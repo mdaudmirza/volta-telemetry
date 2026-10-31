@@ -58,10 +58,10 @@ function updateHeading() {                                    // from the last G
 // Each map offers: update(), zoomIn(), zoomOut(), fitLap(pad), resize(), setTheme(t), destroy(), plus follow / fitted / onFollow.
 function makeMap(el, opts = {}) { return mapKind === "google" ? makeGoogleMap(el, opts) : makeLeafletMap(el, opts); }
 
-function makeGoogleMap(el, { theme = "dark", follow = true, mini = false } = {}) {
+function makeGoogleMap(el, { theme = "dark", follow = true, mini = false, still = false } = {}) {
   const g = google.maps, ll = p => ({ lat: p[0], lng: p[1] });
   const map = new g.Map(el, { center: ll(MAP_HOME), zoom: 17, minZoom: 3, maxZoom: 20, disableDefaultUI: true, clickableIcons: false,
-    keyboardShortcuts: !mini, gestureHandling: mini ? "none" : "greedy", backgroundColor: "#0b0c0e", styles: theme === "dark" ? GDARK : [] });
+    keyboardShortcuts: !(mini || still), gestureHandling: mini || still ? "none" : "greedy", backgroundColor: "#0b0c0e", styles: theme === "dark" ? GDARK : [] });
   const line = new g.Polyline({ map, strokeColor: "#ff8a1f", strokeOpacity: .95, strokeWeight: mini ? 3 : 3.5, clickable: false });
   const start = new g.Marker({ clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 5, fillColor: "#2fbf4a", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 } });
   const kartIcon = { path: "M0 -12 L9 10 L0 5 L-9 10 Z", fillColor: "#ff8a1f", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1.6, scale: 1, anchor: new g.Point(0, 0), rotation: 0 };
@@ -87,9 +87,9 @@ function makeGoogleMap(el, { theme = "dark", follow = true, mini = false } = {})
   return m;
 }
 
-function makeLeafletMap(el, { theme = "dark", follow = true, mini = false } = {}) {
+function makeLeafletMap(el, { theme = "dark", follow = true, mini = false, still = false } = {}) {
   const map = L.map(el, { zoomControl: false, attributionControl: !mini, zoomSnap: 0.5, minZoom: 3, maxZoom: 20, fadeAnimation: !mini,
-    ...(mini ? { dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false } : {}) }).setView(MAP_HOME, 17);
+    ...(mini || still ? { dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false } : {}) }).setView(MAP_HOME, 17);
   if (!mini) map.attributionControl.setPrefix(false);                        // the mini map's credit is in Settings > About
   const tiles = L.tileLayer(TILE_URL, { maxZoom: 20, maxNativeZoom: 19, attribution: TILE_ATTR, className: theme === "dark" ? "tiles-dark" : "" }).addTo(map);
   const line = L.polyline([], { color: "#ff8a1f", weight: mini ? 3 : 3.5, opacity: .95, className: "trackline", interactive: false }).addTo(map);
@@ -217,13 +217,7 @@ function hudMarkup() {
       <div class="hbar"><i id="hKwBar"></i><b id="hKwZero"></b></div><div class="hl">Power</div></div></button>
     <div class="hp h-map cut-t"><div class="in"><div id="hMap" role="application" aria-label="Live track map"></div>
       <div class="mapui tl"><div class="north" aria-hidden="true"><svg width="14" height="16" viewBox="0 0 14 16"><path d="M7 0 L13 15 L7 11 L1 15Z" fill="#ff8a1f"/></svg>N</div></div>
-      <div class="mapui br">
-        <button class="mbtn" type="button" id="hZoomIn" aria-label="Zoom in">+</button>
-        <button class="mbtn" type="button" id="hZoomOut" aria-label="Zoom out">−</button>
-        <button class="mbtn" type="button" id="hFollow" aria-pressed="true" aria-label="Follow the kart"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
-        <button class="mbtn" type="button" id="hFit" aria-label="Show the whole track"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-        <button class="mbtn" type="button" id="hBig" aria-label="Full-screen map"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
-      </div>
+      <button class="maptap" type="button" id="hMapTap" aria-label="Open the full-screen map"></button>
       <div class="mapnote" id="hMapNote">Waiting for GPS fix</div></div></div>
     <div class="hp h-temps cut-l"><div class="in">
       <button class="tg" type="button" data-part="motor" aria-label="Motor temperature, details">${tempSvg("tMot")}<span class="hl">Motor temp</span><span class="st" id="hTs_tMot"></span></button>
@@ -258,9 +252,9 @@ const HUD_PLAN = {
   amps:   [[79, 0], [100, 0], [100, 38], [69.5, 38]],
   power:  [[0, 38], [30.5, 38], [33, 48], [22, 79], [0, 79]],
   map:    [[33, 48], [67, 48], [78, 79], [72, 100], [28, 100], [22, 79]],
-  temps:  [[69.5, 38], [100, 38], [100, 79], [78, 79], [67, 48]],
+  pedals: [[69.5, 38], [100, 38], [100, 79], [78, 79], [67, 48]],
   lap:    [[0, 79], [22, 79], [28, 100], [0, 100]],
-  pedals: [[78, 79], [100, 79], [100, 100], [72, 100]],
+  temps:  [[78, 79], [100, 79], [100, 100], [72, 100]],
 };
 function insetPoly(pts, d) {                                  // a convex polygon moved d px inwards on every side
   const n = pts.length; let area = 0;
@@ -301,10 +295,7 @@ function buildHud() {
   $("hud").addEventListener("click", e => { const b = e.target.closest("[data-part]"); if (b) openPart(b.dataset.part); });
   $("hudClose").onclick = () => closeHud();
   $("hLapBtn").onclick = () => markLap();
-  $("hZoomIn").onclick = () => hudMap && hudMap.zoomIn(); $("hZoomOut").onclick = () => hudMap && hudMap.zoomOut();
-  $("hFollow").onclick = () => { if (!hudMap) return; hudMap.follow = !hudMap.follow; $("hFollow").setAttribute("aria-pressed", hudMap.follow); hudMap.update(); };
-  $("hFit").onclick = () => { if (!hudMap || lapTrack.length < 2) return; hudMap.follow = false; $("hFollow").setAttribute("aria-pressed", "false"); hudMap.fitLap(30); };
-  $("hBig").onclick = () => openMapFull();
+  $("hMapTap").onclick = () => openMapFull();                      // tap anywhere on the map: the full-screen map, with its buttons
   // the mode chip on the RPM gauge: tap for the next drive mode (not the motor details behind it)
   $("hMode").addEventListener("click", e => { e.stopPropagation(); cycleMode(); });
   $("hMode").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); cycleMode(); } });
@@ -327,7 +318,7 @@ function openHud() {
 function hudMapShow() {
   mapsReady.then(() => {
     if (!mapsAvailable()) { $("hMapNote").textContent = "Map unavailable"; return; }
-    if (!hudMap) { hudMap = makeMap($("hMap"), { theme: "dark", follow: true }); hudMap.onFollow = f => $("hFollow").setAttribute("aria-pressed", f); }
+    if (!hudMap) hudMap = makeMap($("hMap"), { theme: "dark", follow: true, still: true });
     hudMap.resize(); hudMap.update();
   });
 }
