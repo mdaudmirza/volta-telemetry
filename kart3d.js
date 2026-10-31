@@ -568,6 +568,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   function explode(on) {
     if (busy || !!splitTo === !!on) return;
     busy = true; selected = null;
+    if (typeof sfx !== "undefined") on ? sfx.split() : sfx.join();         // whoosh-clunk apart, and back together
     if (on) document.body.classList.add("kart-split");                    // everything else steps away while the kart is apart
     view("all", false, () => {
       splitTo = on ? 1 : 0; done.hidden = !on; wrap.classList.toggle("split", on);

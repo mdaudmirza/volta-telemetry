@@ -651,24 +651,66 @@ const spd = k => typeof k === "number" && isFinite(k) && unitMph ? k * MI : k;  
 const spdUnit = () => unitMph ? "mph" : "km/h", distUnit = () => unitMph ? "mi" : "km";
 const optOn = k => store.get(k, "on") !== "off";
 const buzz = p => { if (optOn("buzz") && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) try { navigator.vibrate(p); } catch (e) {} };   // phones allow it only after a tap
-// sounds are made in the app (Web Audio), nothing to download
+// sound effects, made in the app with Web Audio (nothing to download); Settings > Sounds turns them all off.
+// Phones only allow sound after the first tap, so the launch screen stays silent.
 const sfx = (() => {
-  let ctx = null;
-  const ac = () => { if (!ctx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ctx = new C(); } if (ctx.state === "suspended") ctx.resume(); return ctx; };
-  function tone(f0, f1, dur, { type = "sine", vol = 0.12, at = 0, lp = 0 } = {}) {
-    const c = ac(); if (!c) return; const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
-    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.08, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    let n = o; if (lp) { const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp; o.connect(f); n = f; }
-    n.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+  let ctx = null, master = null, noiseBuf = null, lastAlarm = 0;
+  const ac = () => {
+    if (!ctx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ctx = new C();
+      master = ctx.createDynamicsCompressor(); master.connect(ctx.destination); }
+    if (ctx.state === "suspended") ctx.resume(); return ctx;
+  };
+  const on = () => optOn("sound") && ac();
+  // a tone that glides from f0 to f1, with a soft attack and release; optional low-pass filter
+  function tone(f0, f1, dur, { type = "sine", vol = 0.1, at = 0, lp = 0, q = 1 } = {}) {
+    const c = ctx, t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.04, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let n = o; if (lp) { const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp; f.Q.value = q; o.connect(f); n = f; }
+    n.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+  }
+  // filtered noise whose band sweeps from f0 to f1: whooshes, swishes, the electric charge-up
+  function noise(f0, f1, dur, { vol = 0.08, at = 0, q = 1.2, type = "bandpass" } = {}) {
+    const c = ctx, t = c.currentTime + at;
+    if (!noiseBuf) { noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = noiseBuf; src.loop = true; f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.35); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + 0.05);
   }
   return {
-    startup() { if (!optOn("sound")) return; tone(55, 165, 1.4, { type: "sawtooth", vol: 0.05, lp: 900 }); tone(220, 660, 1.2, { vol: 0.045, at: 0.15 }); tone(1320, 1320, 0.09, { vol: 0.05, at: 1.3 }); },
-    lapStart() { if (optOn("sound")) tone(880, 880, 0.14, { type: "square", vol: 0.04, lp: 3000 }); },
-    lapStop() { if (!optOn("sound")) return; tone(660, 660, 0.11, { type: "square", vol: 0.04, lp: 3000 }); tone(990, 990, 0.18, { type: "square", vol: 0.04, at: 0.14, lp: 3000 }); },
+    // the dashboard's start-up, in time with its animation: telltale blips, charge-up, panel thunks, a rev with the tachometer sweep
+    ignition() {
+      if (!on()) return;
+      [0.12, 0.3, 0.48].forEach(at => tone(1560, 1560, 0.06, { type: "square", vol: 0.025, at, lp: 4000 }));
+      noise(300, 5200, 0.6, { vol: 0.05, at: 0.55, q: 6 }); tone(90, 520, 0.6, { type: "sawtooth", vol: 0.025, at: 0.55, lp: 1400 });
+      [1.0, 1.06, 1.12, 1.18, 1.24].forEach((at, i) => tone(140 - i * 6, 60, 0.12, { vol: 0.07, at }));
+      tone(70, 330, 0.5, { type: "sawtooth", vol: 0.06, at: 1.2, lp: 1100, q: 4 }); tone(330, 330, 0.12, { type: "sawtooth", vol: 0.05, at: 1.7, lp: 1100, q: 4 });
+      tone(330, 85, 0.45, { type: "sawtooth", vol: 0.05, at: 1.82, lp: 900, q: 4 }); tone(1320, 1320, 0.1, { vol: 0.035, at: 2.25 });
+    },
+    whoosh() { if (on()) { noise(500, 3800, 0.55, { vol: 0.07, q: 0.9 }); tone(180, 90, 0.5, { vol: 0.03, at: 0.1 }); } },
+    split() { if (on()) { noise(1800, 400, 0.45, { vol: 0.06, q: 1 }); tone(160, 70, 0.2, { type: "triangle", vol: 0.08, at: 0.42 }); tone(900, 900, 0.04, { type: "square", vol: 0.02, at: 0.45, lp: 3000 }); } },
+    join() { if (on()) { noise(400, 1800, 0.45, { vol: 0.06, q: 1 }); tone(120, 60, 0.18, { type: "triangle", vol: 0.09, at: 0.5 }); tone(700, 700, 0.04, { type: "square", vol: 0.02, at: 0.52, lp: 3000 }); } },
+    swish() { if (on()) noise(900, 4200, 0.22, { vol: 0.035, q: 1.4 }); },
+    tick() { if (on()) tone(2400, 1800, 0.03, { type: "square", vol: 0.012, lp: 5000 }); },
+    // drive modes: Eco a soft chime, Drive a firm tone, Sport an aggressive rev blip
+    mode(n) {
+      if (!on()) return;
+      if (n === 0) { tone(660, 660, 0.25, { vol: 0.05 }); tone(990, 990, 0.35, { vol: 0.04, at: 0.12 }); }
+      else if (n === 2) { tone(90, 420, 0.28, { type: "sawtooth", vol: 0.07, lp: 1500, q: 5 }); tone(420, 140, 0.35, { type: "sawtooth", vol: 0.06, at: 0.27, lp: 1200, q: 5 }); }
+      else { tone(440, 440, 0.18, { type: "triangle", vol: 0.07 }); tone(587, 587, 0.22, { type: "triangle", vol: 0.06, at: 0.12 }); }
+    },
+    lapStart() { if (on()) tone(880, 880, 0.14, { type: "square", vol: 0.04, lp: 3000 }); },
+    lapStop() { if (!on()) return; tone(660, 660, 0.11, { type: "square", vol: 0.04, lp: 3000 }); tone(990, 990, 0.18, { type: "square", vol: 0.04, at: 0.14, lp: 3000 }); },
+    // a critical fault appears: a two-tone alarm, at most every 20 s
+    alarm() {
+      const now = Date.now(); if (now - lastAlarm < 20000 || !on()) return; lastAlarm = now;
+      for (let i = 0; i < 3; i++) { tone(960, 960, 0.16, { type: "square", vol: 0.05, at: i * 0.36, lp: 3500 }); tone(720, 720, 0.16, { type: "square", vol: 0.05, at: i * 0.36 + 0.18, lp: 3500 }); }
+    },
   };
 })();
-document.addEventListener("click", e => { if (e.target.closest("button, [role=button], .rowi")) buzz(8); }, true);
+document.addEventListener("click", e => { if (e.target.closest("button, [role=button], .rowi")) { buzz(8); sfx.tick(); } }, true);
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fin = x => typeof x === "number" && isFinite(x);
 const fmt = (x, d = 0) => { if (!fin(x)) return "--"; const r = x.toFixed(d); return /^-0(\.0+)?$/.test(r) ? r.slice(1) : r; };
@@ -812,7 +854,7 @@ function render(s) {
   for (let b = 0; b < MC_FAULT.length; b++) if (mcHas(b)) { list.push("MC: " + MC_FAULT[b]); crit = true; }
   if (s.mcState === 5) crit = true;
   const al = $("alert");
-  if (list.length) { al.dataset.sev = crit ? "crit" : "warn"; $("alertText").textContent = list.join(" · "); $("alertTag").textContent = crit ? "Stop" : "Warning"; $("alertIco").setAttribute("href", crit ? "#i-stop" : "#i-warn"); }
+  if (list.length) { if (crit && al.dataset.sev !== "crit") sfx.alarm(); al.dataset.sev = crit ? "crit" : "warn"; $("alertText").textContent = list.join(" · "); $("alertTag").textContent = crit ? "Stop" : "Warning"; $("alertIco").setAttribute("href", crit ? "#i-stop" : "#i-warn"); }
   else { al.dataset.sev = "ok"; $("alertText").textContent = "All systems normal"; $("alertTag").textContent = ""; $("alertIco").setAttribute("href", "#i-ok"); }
 
   // kart zones: temperature limits plus the fault bits that belong to each part
@@ -921,6 +963,7 @@ function showTab(t) {
 }
 // menu (top left): Drive, Systems, Laps, Settings
 function setMenu(open) {
+  if (open && $("menu").hidden) sfx.swish();
   $("menu").hidden = !open; $("menuBtn").setAttribute("aria-expanded", open);
   if (open) ($("menu").querySelector('[aria-current="page"]') || $("menu").querySelector("button")).focus({ preventScroll: true });
 }
@@ -1069,7 +1112,7 @@ function handleBleLine(line) {
   if (line === "ERR,AUTH") { toast("Enter the control PIN in Settings first"); return; }
   // the kart answers with the number (OK,MODE,1): show its name
   const named = (list, v) => /^[0-9]$/.test(v) && list[+v] ? list[+v] : v;
-  if (line.startsWith("OK,MODE,")) { buzz([18, 40, 18]); toast("Mode: " + named(MODES, line.slice(8))); return; }
+  if (line.startsWith("OK,MODE,")) { buzz([18, 40, 18]); sfx.mode(+line.slice(8)); return; }   // no pop-up: the colours already show the mode
   if (line.startsWith("OK,LAMP,")) { toast("Headlamps: " + named(LAMPS, line.slice(8))); return; }
   if (line.startsWith("OK,")) toast("Kart confirmed " + line.slice(3).replace(",", " "));
 }
@@ -1263,7 +1306,7 @@ function feelUi() {
 }
 $("segUnits").onclick = e => { const b = e.target.closest("button"); if (!b) return; unitMph = b.dataset.v === "mph"; store.set("units", b.dataset.v); feelUi(); if (last) render(last); };
 $("optAwake").onchange = e => { store.set("awake", e.target.checked ? "on" : "off"); if (e.target.checked) wakeLock(); else if (wakeSentinel) { wakeSentinel.release().catch(() => {}); wakeSentinel = null; } };
-$("optSound").onchange = e => { store.set("sound", e.target.checked ? "on" : "off"); if (e.target.checked) sfx.lapStart(); };
+$("optSound").onchange = e => { store.set("sound", e.target.checked ? "on" : "off"); if (e.target.checked) sfx.mode(0); };
 $("optBuzz").onchange = e => { store.set("buzz", e.target.checked ? "on" : "off"); buzz(40); };
 $("segSens").onclick = e => { const b = e.target.closest("button"); if (!b) return; store.set("sens", b.dataset.v); if (window.kart3d && kart3d.sensitivity) kart3d.sensitivity(b.dataset.v); feelUi(); };
 $("btnReset").onclick = () => $("btnClear").click();

@@ -358,6 +358,7 @@ function openMapFull() {
   if (!$("mapFull")) buildMapFull();
   const d = $("mapFull"); if (!d.hidden) return;
   d.hidden = false; requestAnimationFrame(() => d.classList.add("open"));
+  if (typeof sfx !== "undefined") sfx.swish();
   history.pushState({ mapfull: 1 }, "");
   $("mfNote").hidden = !!lastFix;
   setTimeout(fullMapShow, 120);
@@ -378,7 +379,7 @@ function closeMapFull(fromPop) {
 window.openMapFull = openMapFull;
 window.addEventListener("kartopen", openHud);
 // build the dashboard ahead of time (idle moment, or as the fly-in starts) so opening it never stutters
-window.addEventListener("kartopening", () => { if (!hudBuilt) buildHud(); });
+window.addEventListener("kartopening", () => { if (!hudBuilt) buildHud(); if (typeof sfx !== "undefined") sfx.whoosh(); });
 (window.requestIdleCallback || (fn => setTimeout(fn, 1500)))(() => { if (!hudBuilt) buildHud(); });
 window.openHud = openHud;
 
@@ -402,7 +403,7 @@ function hudPowerOn() {
   // like the preview video: telltales blink (0-0.9 s), outlines draw in (0.55-1.2 s), panels light (from 1.0 s),
   // then the tachometer fills to the redline and settles while the speed counts up (from 1.2 s)
   h.classList.remove("poweron"); void h.offsetWidth; h.classList.add("poweron"); setTimeout(() => h.classList.remove("poweron"), 2500);
-  if (typeof sfx !== "undefined") sfx.startup();                    // the start-up hum (Settings > Sounds)
+  if (typeof sfx !== "undefined") sfx.ignition();                   // the start-up sounds, in time with the animation (Settings > Sounds)
   const leds = $("hLeds").querySelectorAll(".led"), n = leds.length, up = 480, hold = 110, down = 420, kmh = $("hKmh");
   hudSweep = true; leds.forEach(el => el.classList.remove("on")); kmh.textContent = "0";
   setTimeout(() => {
