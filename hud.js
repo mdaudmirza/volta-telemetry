@@ -224,7 +224,7 @@ function hudMarkup() {
       <button class="tg" type="button" data-part="battery" aria-label="Battery temperature, details">${tempSvg("tBatt")}<span class="hl">Battery temp</span><span class="st" id="hTs_tBatt"></span></button></div></div>
     <div class="hp h-lap cut-tr"><div class="in">
       <div class="txt"><div class="hl" id="hLapLbl">Lap</div><div class="hv" id="hLapNow">0:00.0</div><div class="hs" id="hLapSub">Tap the flag at the start line</div></div>
-      <button class="flagbtn" type="button" id="hLapBtn" aria-label="Mark lap"><svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></svg></button></div></div>
+      <button class="flagbtn" type="button" id="hLapBtn" aria-label="Start lap"><svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></svg></button></div></div>
     <div class="hp h-pedals cut-tl"><div class="in">
       <div class="ped"><span class="hl">Throttle</span><div class="hbar"><i id="hThr"></i></div><span class="r" id="hThrT">--</span></div>
       <div class="ped" title="No brake sensor yet: regenerative braking current is shown"><span class="hl">Regen</span><div class="hbar"><i id="hRegen"></i></div><span class="r" id="hRegT">--</span></div>
@@ -294,7 +294,7 @@ function buildHud() {
   document.body.insertAdjacentHTML("beforeend", hudMarkup()); hudBuilt = true;
   $("hud").addEventListener("click", e => { const b = e.target.closest("[data-part]"); if (b) openPart(b.dataset.part); });
   $("hudClose").onclick = () => closeHud();
-  $("hLapBtn").onclick = () => markLap();
+  $("hLapBtn").onclick = () => lapToggle();                         // press: start the lap; press again: stop it
   $("hMapTap").onclick = () => openMapFull();                      // tap anywhere on the map: the full-screen map, with its buttons
   // the mode chip on the RPM gauge: tap for the next drive mode (not the motor details behind it)
   $("hMode").addEventListener("click", e => { e.stopPropagation(); cycleMode(); });
@@ -385,9 +385,14 @@ window.openHud = openHud;
 // ---------- live values ----------
 let mapTick = 0;
 function hudTick() {
-  if (lapStart) $("hLapNow").textContent = mmss(Date.now() - lapStart);
-  $("hLapLbl").textContent = lapStart ? `Lap ${lapNo}` : "Lap";
-  $("hLapSub").textContent = !lapStart ? "Tap flag at start line" : lapNo > 1 ? `Last ${mmss(lastLapMs)} · Best ${mmss(best)}` : "Timing first lap";
+  $("hLapNow").textContent = lapStart ? mmss(Date.now() - lapStart) : lastLapMs ? mmss(lastLapMs) : "0:00.0";
+  $("hLapLbl").textContent = lapStart ? `Lap ${lapNo}` : lastLapMs ? `Lap ${lapNo} · done` : "Lap";
+  $("hLapSub").textContent = lapStart ? "Tap to stop" : lastLapMs ? `Best ${mmss(best)}` : "Tap flag to start";
+  const fb = $("hLapBtn"), run = !!lapStart;
+  if (fb.classList.contains("running") !== run) {                        // flag to start, square to stop
+    fb.classList.toggle("running", run); fb.setAttribute("aria-label", run ? "Stop lap" : "Start lap");
+    fb.innerHTML = run ? '<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></svg>';
+  }
   const c = $("chip"); $("hStatus").dataset.s = c.dataset.s; $("hStatusT").textContent = $("chipText").textContent;
 }
 let hudLit = -1, hudSweep = false;

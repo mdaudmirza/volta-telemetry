@@ -521,7 +521,7 @@ body.sheet-open .sheet { transform: none; }
       <h2>Laps</h2>
       <div class="card">
         <div class="lapstats">
-          <button class="btn primary" type="button" id="btnLap"><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg>Mark lap</button>
+          <button class="btn primary" type="button" id="btnLap"><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg>Start lap</button>
           <div><div class="lbl">Last lap</div><div class="val num" id="lastLap">--</div></div>
           <div><div class="lbl">Best lap</div><div class="val num" id="bestLap">--</div></div>
           <div><div class="lbl">Laps</div><div class="val num" id="lapCount">0</div></div>
@@ -1126,9 +1126,20 @@ function markLap() {
   lapTrack = lastFix ? [lastFix] : [];                                     // new lap: the map line starts over
   toast(lapNo === 1 ? "Lap timer started" : `Lap ${lapNo - 1} recorded`); lapUi(); if (window.mapsTick) mapsTick();
 }
+// one button: the first press starts a lap, the next press stops it and records the time
+function lapToggle() {
+  if (!lapStart) { lapStart = Date.now(); lapNo++; lapTrack = lastFix ? [lastFix] : []; toast("Lap started"); }
+  else {
+    lastLapMs = Date.now() - lapStart; best = Math.min(best, lastLapMs); lapStart = 0;
+    $("lastLap").textContent = mmss(lastLapMs); $("bestLap").textContent = mmss(best); $("lapCount").textContent = lapNo;
+    toast(`Lap ${lapNo}: ${mmss(lastLapMs)}`);
+  }
+  $("btnLap").lastChild.textContent = lapStart ? "Stop lap" : "Start lap";
+  lapUi(); if (window.mapsTick) mapsTick();
+}
 function stopLaps() { lapStart = 0; lapTrack = []; lapUi(); toast("Lap timing stopped"); if (window.mapsTick) mapsTick(); }
 if ($("lapPill")) $("lapPill").onclick = e => { const b = e.target.closest("button"); if (!b) return; b.dataset.act === "stop" ? stopLaps() : markLap(); };
-$("btnLap").onclick = markLap;
+$("btnLap").onclick = lapToggle;
 setInterval(() => { const el = $("lapNow"); if (lapStart && el) el.textContent = mmss(Date.now() - lapStart); }, 100);
 const COLS = ["t", "lap", "kmh", "rpm", "soc", "v", "i", "kw", "cellHi", "cellLo", "tBatt", "tMot", "tInv", "coolant", "v12", "thr", "mcState", "mcFault", "faults", "lat", "lon", "sats", "fix", "pitch", "roll", "mode", "lamp"];
 $("btnCsv").onclick = () => {

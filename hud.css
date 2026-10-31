@@ -319,3 +319,11 @@ button.hp:focus-visible { outline: none; background: #fff; }
 .interlock .h-temps .tg svg { height: clamp(40px, 12vh, 60px); width: auto; max-width: none; grid-row: auto; }
 .interlock .h-temps .tg .hl { font-size: 9px; text-align: center; line-height: 1.15; }
 .interlock .h-temps .tg .st { min-height: 0; font-size: 9px; }
+
+/* throttle / regen rows kept clear of the map's slanted edge (it cuts further in towards the bottom of the panel) */
+.interlock .h-pedals .in { padding: 18px 22px 10px 28%; align-content: start; gap: 14px; }
+/* the lap button turns red with a square while a lap is running */
+.flagbtn.running { border-color: #ff453a; color: #ff453a; background: rgba(255,69,58,.14); box-shadow: 0 0 12px rgba(255,69,58,.35); }
+.flagbtn.running svg rect { fill: currentColor; stroke: none; }
+/* connection status sits under the map, clear of the temperature labels */
+.interlock ~ .hud-status { right: auto; left: 31%; }
