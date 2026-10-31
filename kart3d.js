@@ -143,6 +143,10 @@ function start(levelName) {
   camera.up.set(0, 0, 1);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.dampingFactor = 0.08; controls.enablePan = false;
+  // drag sensitivity (Settings > Kart sensitivity): Medium is a touch gentler than the old default, High is the old default
+  const SENS = { low: 0.35, medium: 0.6, high: 1 };
+  const setSens = v => { const k = SENS[v] || SENS.medium; controls.rotateSpeed = k; controls.zoomSpeed = 0.5 + k / 2; };
+  setSens(lsGet("sens"));
   controls.minPolarAngle = 0.15; controls.maxPolarAngle = 1.5;
   controls.target.set(0, 0.05, -0.2);
   controls.addEventListener("change", () => need = true);
@@ -627,6 +631,7 @@ for (int i = 0; i < ${MAXB}; i++) totalEmissiveRadiance += uZCol[i] * uZStr[i] *
   }
 
   window.kart3d = {
+    sensitivity(v) { setSens(v); },
     update(s) { state = s; applyState(performance.now()); },
     select(part) { selected = part || null; view(part || "all"); applyState(performance.now()); },
     explode, home, quality: levelName,
