@@ -208,7 +208,7 @@ function hudMarkup() {
       <div class="vsegs" id="hSegs">${"<i></i>".repeat(SEGS)}</div>
       <div class="txt"><div class="hl">Battery voltage</div><div class="hv"><span id="hV">--</span><small>V</small></div><div class="hs" id="hSoc">SoC --</div><div class="hs" id="hRange">Range --</div></div></div></button>
     <button class="hp h-rpm cut-b" type="button" data-part="motor" aria-label="Motor details"><div class="in">${rpmSvg()}
-      <div class="spdc"><span class="big" id="hKmh">--</span><span class="u">km/h</span><span class="hs" id="hRpm">-- rpm</span></div>
+      <div class="spdc"><span class="big" id="hKmh">--</span><span class="u" data-unit="speed">km/h</span><span class="hs" id="hRpm">-- rpm</span></div>
       <span class="mode-chip" id="hMode" role="button" tabindex="0" aria-label="Drive mode. Tap to change">Mode --</span></div></button>
     <button class="hp h-amps cut-bl" type="button" data-part="inverter" aria-label="Pack current, inverter details"><div class="in">${ampSvg()}
       <span class="hl top">Current</span><div class="ampc"><div class="hv"><span id="hA">--</span><small>A</small></div></div></div></button>
@@ -402,10 +402,11 @@ function hudPowerOn() {
   // like the preview video: telltales blink (0-0.9 s), outlines draw in (0.55-1.2 s), panels light (from 1.0 s),
   // then the tachometer fills to the redline and settles while the speed counts up (from 1.2 s)
   h.classList.remove("poweron"); void h.offsetWidth; h.classList.add("poweron"); setTimeout(() => h.classList.remove("poweron"), 2500);
+  if (typeof sfx !== "undefined") sfx.startup();                    // the start-up hum (Settings > Sounds)
   const leds = $("hLeds").querySelectorAll(".led"), n = leds.length, up = 480, hold = 110, down = 420, kmh = $("hKmh");
   hudSweep = true; leds.forEach(el => el.classList.remove("on")); kmh.textContent = "0";
   setTimeout(() => {
-    const t0 = performance.now(), target = last && fin(last.kmh) ? Math.round(last.kmh) : 0;
+    const t0 = performance.now(), target = last && fin(last.kmh) ? Math.round(spd(last.kmh)) : 0;
     const step = t => {
       const e = t - t0, k = e < up ? e / up : e < up + hold ? 1 : Math.max(0, 1 - (e - up - hold) / down), lit = Math.round(n * (1 - Math.pow(1 - k, 2)));
       leds.forEach((el, i) => el.classList.toggle("on", i < lit));
@@ -421,9 +422,10 @@ function hudRender(s) {
   $("hV").textContent = fmt(s.v, 1);
   const vf = fin(s.v) ? Math.max(0, Math.min(1, (s.v - V_MIN) / (V_MAX - V_MIN))) : 0, on = Math.round(vf * SEGS);
   $("hSegs").querySelectorAll("i").forEach((el, i) => { el.className = i < on ? (i < 3 ? "on low" : i < 6 ? "on mid" : "on") : ""; });
-  $("hSoc").textContent = `SoC ${fmt(s.soc, 0)}%`; $("hRange").textContent = `Range ~${fin(rangeKm) ? fmt(rangeKm, rangeKm < 10 ? 1 : 0) : "--"} km`;
+  $("hSoc").textContent = `SoC ${fmt(s.soc, 0)}%`; const rd = spd(rangeKm); $("hRange").textContent = `Range ~${fin(rd) ? fmt(rd, rd < 10 ? 1 : 0) : "--"} ${distUnit()}`;
   // speed + rpm
-  if (!hudSweep) $("hKmh").textContent = fmt(s.kmh, 0);
+  if (!hudSweep) $("hKmh").textContent = fmt(spd(s.kmh), 0);
+  const su = h.querySelector("[data-unit=speed]"); if (su.textContent !== spdUnit()) su.textContent = spdUnit();
   $("hRpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
   const lit = Math.round(LEDS * Math.max(0, Math.min(1, Math.abs(s.rpm || 0) / RPM_MAX)));
   if (!hudSweep && lit !== hudLit) { hudLit = lit; $("hLeds").querySelectorAll(".led").forEach((el, i) => el.classList.toggle("on", i < lit)); }

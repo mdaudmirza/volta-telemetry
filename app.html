@@ -499,7 +499,7 @@ body.sheet-open .sheet { transform: none; }
           <div class="dial kwdial" id="kwDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
             <div class="gin"><span class="big num" id="kw">--</span><span class="u">kW</span></div></div>
           <div class="dial" id="speedDial"><svg viewBox="0 0 200 200" aria-hidden="true"></svg>
-            <div class="gin"><span class="big num" id="kmh">--</span><span class="u">km/h</span><span class="sm num" id="rpm">-- rpm</span><button class="mode" id="modeTxt" type="button" aria-label="Drive mode. Tap to change"></button></div></div>
+            <div class="gin"><span class="big num" id="kmh">--</span><span class="u" data-unit="speed">km/h</span><span class="sm num" id="rpm">-- rpm</span><button class="mode" id="modeTxt" type="button" aria-label="Drive mode. Tap to change"></button></div></div>
         </div>
 
       </div>
@@ -572,6 +572,20 @@ body.sheet-open .sheet { transform: none; }
         <button class="rowi" type="button" role="radio" data-v="blender"><span>Blender paint</span><span class="muted">Like the Blender renders</span></button>
       </div>
       <p class="note">Blender paint adds soft shadows, studio reflections and the renders' colours. Changing this reloads the app.</p>
+      <h3>Display and sound</h3>
+      <div class="group">
+        <div class="segrow"><div class="lbl">Speed units</div>
+          <div class="seg" id="segUnits" role="group" aria-label="Speed units"><button type="button" data-v="kmh">km/h</button><button type="button" data-v="mph">mph</button></div></div>
+      </div>
+      <div class="group" style="margin-top:10px">
+        <label class="rowi" for="optAwake"><span>Keep screen on</span><input class="switch" type="checkbox" id="optAwake"></label>
+        <label class="rowi" for="optSound"><span>Sounds</span><input class="switch" type="checkbox" id="optSound"></label>
+        <label class="rowi" for="optBuzz"><span>Vibration</span><input class="switch" type="checkbox" id="optBuzz"></label>
+      </div>
+      <p class="note">Sounds: a start-up hum when the dashboard comes to life and a beep for each lap. Vibration works on Android phones.</p>
+      <h3>Session</h3>
+      <div class="group"><button class="rowi" type="button" id="btnReset"><span style="color:var(--crit)">Reset session</span></button></div>
+      <p class="note">Clears the recorded samples, lap times and the track. Download the CSV from Laps first if you need them.</p>
       <div id="installBox" hidden>
         <h3>App</h3>
         <div class="group"><button class="rowi" type="button" id="btnInstall"><span>Install on This Phone</span><svg class="ico chev" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
@@ -620,6 +634,31 @@ const RPM_MAX = 12000, RPM_RED = 11000, KW_MAX = 70, KW_MIN = -15, V_MIN = 290, 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
 const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+// ---------- feel: speed units, sounds, vibration ----------
+const MI = 0.621371;
+let unitMph = store.get("units", "kmh") === "mph";
+const spd = k => typeof k === "number" && isFinite(k) && unitMph ? k * MI : k;       // km/h in, the chosen unit out
+const spdUnit = () => unitMph ? "mph" : "km/h", distUnit = () => unitMph ? "mi" : "km";
+const optOn = k => store.get(k, "on") !== "off";
+const buzz = p => { if (optOn("buzz") && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) try { navigator.vibrate(p); } catch (e) {} };   // phones allow it only after a tap
+// sounds are made in the app (Web Audio), nothing to download
+const sfx = (() => {
+  let ctx = null;
+  const ac = () => { if (!ctx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ctx = new C(); } if (ctx.state === "suspended") ctx.resume(); return ctx; };
+  function tone(f0, f1, dur, { type = "sine", vol = 0.12, at = 0, lp = 0 } = {}) {
+    const c = ac(); if (!c) return; const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.08, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let n = o; if (lp) { const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp; o.connect(f); n = f; }
+    n.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+  return {
+    startup() { if (!optOn("sound")) return; tone(55, 165, 1.4, { type: "sawtooth", vol: 0.05, lp: 900 }); tone(220, 660, 1.2, { vol: 0.045, at: 0.15 }); tone(1320, 1320, 0.09, { vol: 0.05, at: 1.3 }); },
+    lapStart() { if (optOn("sound")) tone(880, 880, 0.14, { type: "square", vol: 0.04, lp: 3000 }); },
+    lapStop() { if (!optOn("sound")) return; tone(660, 660, 0.11, { type: "square", vol: 0.04, lp: 3000 }); tone(990, 990, 0.18, { type: "square", vol: 0.04, at: 0.14, lp: 3000 }); },
+  };
+})();
+document.addEventListener("click", e => { if (e.target.closest("button, [role=button], .rowi")) buzz(8); }, true);
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fin = x => typeof x === "number" && isFinite(x);
 const fmt = (x, d = 0) => { if (!fin(x)) return "--"; const r = x.toFixed(d); return /^-0(\.0+)?$/.test(r) ? r.slice(1) : r; };
@@ -736,7 +775,7 @@ function worst(...l) { return l.includes("crit") ? "crit" : l.includes("warn") ?
 let rangeKm = null;
 function render(s) {
   // speed dial: rpm arc, speed, mode
-  $("kmh").textContent = fmt(s.kmh, 0);
+  $("kmh").textContent = fmt(spd(s.kmh), 0);
   $("rpm").textContent = `${fin(s.rpm) ? Math.round(s.rpm).toLocaleString("en-US") : "--"} rpm`;
   setArc("speedDialV", Math.abs(s.rpm || 0) / RPM_MAX); $("speedDialV").style.stroke = Math.abs(s.rpm || 0) >= RPM_RED ? "#ff453a" : "";
   const md = s.mode === 0 ? "eco" : s.mode === 2 ? "sport" : "";                 // Drive keeps the orange theme
@@ -754,7 +793,7 @@ function render(s) {
   // range estimate from charge, pack size and recent consumption (the dashboard shows it)
   const ah = parseFloat(store.get("packAh", "")) || DEFAULT_AH, wk = whPerKm();
   rangeKm = fin(s.soc) ? s.soc / 100 * NOMINAL_V * ah / (wk || DEFAULT_WH_KM) : null;
-  $("rangeTxt").textContent = fin(rangeKm) ? `~${fmt(rangeKm, rangeKm < 10 ? 1 : 0)} km` : "-- km";
+  const rd = spd(rangeKm); $("rangeTxt").textContent = fin(rd) ? `~${fmt(rd, rd < 10 ? 1 : 0)} ${distUnit()}` : `-- ${distUnit()}`;
 
   // faults
   const list = [], has = b => !!(s.faults & (1 << b)), mcHas = b => !!(s.mcFault & (1 << b));
@@ -936,16 +975,16 @@ function partInfo(p, s) {
       ["Highest cell", u(s.cellHi, 3, "V")], ["Lowest cell", u(s.cellLo, 3, "V")], ["Cell spread", fin(s.cellHi) && fin(s.cellLo) ? `${Math.round((s.cellHi - s.cellLo) * 1000)} mV` : "--"],
       ["Temperature", u(s.tBatt, 0, "°C")], ["12 V battery", u(s.v12, 2, "V")]],
       faults: F([[has(0), FAULT_TEXT[0]], [has(4), FAULT_TEXT[4]], [has(5), FAULT_TEXT[5]], [has(8), FAULT_TEXT[8]]]) };
-    case "motor": return { rows: [["Speed", u(s.rpm, 0, "rpm")], ["Road speed", u(s.kmh, 0, "km/h")], ["Temperature", u(s.tMot, 0, "°C")], ["Throttle", u(s.thr, 0, "%")]],
+    case "motor": return { rows: [["Speed", u(s.rpm, 0, "rpm")], ["Road speed", u(spd(s.kmh), 0, spdUnit())], ["Temperature", u(s.tMot, 0, "°C")], ["Throttle", u(s.thr, 0, "%")]],
       faults: F([[mc(3), "Motor overtemperature"], [mc(5), "Hall sensor fault"], [has(6), FAULT_TEXT[6]]]) };
     case "inverter": return { rows: [["State", fin(s.mcState) ? (MC_STATE[s.mcState] || "State " + s.mcState) : "Not reported yet"], ["Temperature", u(s.tInv, 0, "°C")],
       ["Coolant", fin(s.coolant) ? u(s.coolant, 0, "°C") : "No sensor"], ["DC current", u(s.i, 1, "A")]],
       faults: F([[has(1), FAULT_TEXT[1]], [has(3), FAULT_TEXT[3]], [has(7), FAULT_TEXT[7]]]).concat(MC_FAULT.filter((t, b) => b !== 3 && b !== 5 && b !== 10 && mc(b))) };
     case "brakes": return { rows: [], faults: F([[mc(10), "Brake and throttle pressed together"]]),
       note: "The kart has no brake pressure or temperature sensor yet, so there is no live brake data. The motor controller still reports brake and throttle pressed together." };
-    case "tyres": return { rows: [["Road speed", u(s.kmh, 0, "km/h")], ["Pitch / roll", fin(s.pitch) ? `${fmt(s.pitch, 0)}° / ${fmt(s.roll, 0)}°` : "--"]], faults: [],
+    case "tyres": return { rows: [["Road speed", u(spd(s.kmh), 0, spdUnit())], ["Pitch / roll", fin(s.pitch) ? `${fmt(s.pitch, 0)}° / ${fmt(s.roll, 0)}°` : "--"]], faults: [],
       note: "No tyre pressure or temperature sensors on the kart. Speed and incline are shown for reference." };
-    case "driver": return { rows: [["Drive mode", fin(s.mode) ? MODES[s.mode] : "--"], ["Speed", u(s.kmh, 0, "km/h")], ["Throttle", u(s.thr, 0, "%")],
+    case "driver": return { rows: [["Drive mode", fin(s.mode) ? MODES[s.mode] : "--"], ["Speed", u(spd(s.kmh), 0, spdUnit())], ["Throttle", u(s.thr, 0, "%")],
       ["Current lap", lapStart ? mmss(Date.now() - lapStart) : "Not started"], ["Controls", $("pinState") ? $("pinState").textContent : "--"]], faults: [],
       note: "Tap the kart (when it is not split) for the full driver's dashboard." };
     case "cooling": return { rows: [["Coolant", fin(s.coolant) ? u(s.coolant, 0, "°C") : "No sensor yet"], ["Motor", u(s.tMot, 0, "°C")],
@@ -1020,7 +1059,7 @@ function handleBleLine(line) {
   if (line === "ERR,AUTH") { toast("Enter the control PIN in Settings first"); return; }
   // the kart answers with the number (OK,MODE,1): show its name
   const named = (list, v) => /^[0-9]$/.test(v) && list[+v] ? list[+v] : v;
-  if (line.startsWith("OK,MODE,")) { toast("Mode: " + named(MODES, line.slice(8))); return; }
+  if (line.startsWith("OK,MODE,")) { buzz([18, 40, 18]); toast("Mode: " + named(MODES, line.slice(8))); return; }
   if (line.startsWith("OK,LAMP,")) { toast("Headlamps: " + named(LAMPS, line.slice(8))); return; }
   if (line.startsWith("OK,")) toast("Kart confirmed " + line.slice(3).replace(",", " "));
 }
@@ -1128,11 +1167,11 @@ function markLap() {
 }
 // one button: the first press starts a lap, the next press stops it and records the time
 function lapToggle() {
-  if (!lapStart) { lapStart = Date.now(); lapNo++; lapTrack = lastFix ? [lastFix] : []; toast("Lap started"); }
+  if (!lapStart) { lapStart = Date.now(); lapNo++; lapTrack = lastFix ? [lastFix] : []; toast("Lap started"); sfx.lapStart(); buzz(30); }
   else {
     lastLapMs = Date.now() - lapStart; best = Math.min(best, lastLapMs); lapStart = 0;
     $("lastLap").textContent = mmss(lastLapMs); $("bestLap").textContent = mmss(best); $("lapCount").textContent = lapNo;
-    toast(`Lap ${lapNo}: ${mmss(lastLapMs)}`);
+    toast(`Lap ${lapNo}: ${mmss(lastLapMs)}`); sfx.lapStop(); buzz([30, 60, 30]);
   }
   $("btnLap").lastChild.textContent = lapStart ? "Stop lap" : "Start lap";
   lapUi(); if (window.mapsTick) mapsTick();
@@ -1164,7 +1203,13 @@ $("btnInstall").onclick = async () => { if (!installEvt) return; installEvt.prom
 window.addEventListener("appinstalled", () => { $("installBox").hidden = true; toast("Installed"); });
 
 // ---------- misc ----------
-async function wakeLock() { try { if (navigator.wakeLock) await navigator.wakeLock.request("screen"); } catch (e) {} }
+let wakeSentinel = null;
+async function wakeLock() {
+  try { if (optOn("awake") && navigator.wakeLock && document.visibilityState === "visible" && !wakeSentinel) {
+    wakeSentinel = await navigator.wakeLock.request("screen"); wakeSentinel.addEventListener("release", () => { wakeSentinel = null; }); } } catch (e) {}
+}
+document.addEventListener("visibilitychange", wakeLock);
+wakeLock();
 $("fbUrl").value = store.get("fbUrl", ""); $("pin").value = store.get("pin", ""); $("packAh").value = store.get("packAh", "");
 // graphics quality (read by kart3d.js when the page loads)
 const LEVEL_NAME = { high: "High", balanced: "Balanced", smooth: "Smooth", off: "Off" };
@@ -1199,6 +1244,20 @@ function bootDone() {
 window.addEventListener("kartprogress", e => bootProgress(e.detail));
 window.addEventListener("kartready", bootDone);
 setTimeout(bootDone, 9000);                                                  // never keep the driver waiting longer than this
+// display and sound settings
+function feelUi() {
+  for (const b of $("segUnits").querySelectorAll("button")) b.setAttribute("aria-pressed", (b.dataset.v === "mph") === unitMph);
+  document.querySelectorAll("[data-unit=speed]").forEach(e => { e.textContent = spdUnit(); });
+  $("optAwake").checked = optOn("awake"); $("optSound").checked = optOn("sound"); $("optBuzz").checked = optOn("buzz");
+}
+$("segUnits").onclick = e => { const b = e.target.closest("button"); if (!b) return; unitMph = b.dataset.v === "mph"; store.set("units", b.dataset.v); feelUi(); if (last) render(last); };
+$("optAwake").onchange = e => { store.set("awake", e.target.checked ? "on" : "off"); if (e.target.checked) wakeLock(); else if (wakeSentinel) { wakeSentinel.release().catch(() => {}); wakeSentinel = null; } };
+$("optSound").onchange = e => { store.set("sound", e.target.checked ? "on" : "off"); if (e.target.checked) sfx.lapStart(); };
+$("optBuzz").onchange = e => { store.set("buzz", e.target.checked ? "on" : "off"); buzz(40); };
+$("btnReset").onclick = () => $("btnClear").click();
+feelUi();
+// once the kart is on screen, let the offline cache keep the model files (it reuses the copy just downloaded: no second download)
+window.addEventListener("kartready", () => { try { navigator.serviceWorker && navigator.serviceWorker.ready.then(r => r.active && r.active.postMessage("cache-models")); } catch (e) {} });
 // clock and date: full screen hides the phone's own status bar
 function tickClock() {
   const d = new Date();
